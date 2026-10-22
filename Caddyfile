@@ -2,10 +2,10 @@
 {
 	admin off
 	servers {
-		# Railway'in kenar sunucusu (özel ağ) güvenilir; gerçek istemci IP'si X-Forwarded-For'dan
-		# sağdan sola, güvenilir olmayan ilk adres olarak alınır (istemcinin sahte değeri atlanır).
+		# Railway'in kenar sunucusu gerçek istemci IP'sini X-Real-IP'ye yazar ve istemcinin gönderdiği
+		# sahte değeri ezer (canlıda test edildi). Bu başlık sadece özel ağdaki kenar sunucudan gelirse kullanılır.
 		trusted_proxies static private_ranges 100.64.0.0/10
-		trusted_proxies_strict
+		client_ip_headers X-Real-IP
 	}
 }
 
