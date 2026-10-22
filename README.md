@@ -7,8 +7,7 @@ SQL fonksiyonlarında çalışır. Tablolar dışarıya kapalıdır; tarayıcı 
 ## Sayfalar
 - `index.html` — Personel ekranı. İlk açılışta 4 haneli kod girilir, telefon kişiyi hatırlar.
   Sonra tek bir **Mesaiye Başla** butonu var; işyerine 50 m'den uzaksa giriş yapılamaz.
-- `admin.html` — Yönetim paneli. Varsayılan şifre yok: panel ilk açıldığında admin şifresini siz belirlersiniz
-  (kurulumdan hemen sonra açıp belirleyin).
+- `admin.html` — Yönetim paneli. Varsayılan şifre yok; şifre Supabase SQL Editor'dan belirlenir (aşağıya bakın).
   - **Şu An:** kim mesaide, bugünkü hakediş, çıkış yaptırma, gerekirse konumsuz manuel giriş
   - **Personel:** ekle; giriş kodu elle (4 hane) ya da otomatik; varsayılan vardiya, saatlik ücret, haftalık izin günleri
   - **Vardiyalar:** istediğin kadar vardiya (ad, başlangıç, bitiş; gece yarısını geçebilir)
@@ -25,8 +24,11 @@ değiştirmek geçmiş günlerin geç kalma ve hakediş hesabını bozmaz.
 1. supabase.com'da proje açın.
 2. **SQL Editor** → `supabase/schema.sql` dosyasının tamamını yapıştırıp **Run**.
    (Tekrar çalıştırmak güvenlidir, veriyi silmez — güncellemelerde aynı dosyayı yeniden çalıştırın.)
-3. **Project Settings → API**'den Project URL ve anon/publishable key'i `public/config.js`'e yazın.
-4. `public/` klasörünü herhangi bir statik hostinge yükleyin (Netlify Drop, Vercel, Cloudflare Pages, GitHub Pages).
+3. Aynı SQL Editor'da admin şifresini belirleyin (güvenlik için internetten değil, sadece buradan yapılabilir):
+   `select set_admin_password('güçlü-bir-şifre');`
+   Şifreyi unutursanız aynı komutla sıfırlayın. Giriş kilitlenirse: `select admin_unlock();`
+4. **Project Settings → API**'den Project URL ve anon/publishable key'i `public/config.js`'e yazın.
+5. `public/` klasörünü herhangi bir statik hostinge yükleyin (Netlify Drop, Vercel, Cloudflare Pages, GitHub Pages).
 
 > **HTTPS şart:** telefonlar konum iznini yalnızca `https://` sitelerde verir. Yukarıdaki hostingler bunu otomatik sağlar.
 
@@ -36,6 +38,7 @@ Personel linki: `https://siteniz/` · Admin linki: `https://siteniz/admin.html`
 PostgreSQL + PostgREST kurulu olmalı (`brew install postgresql@18 postgrest`).
 ```
 createdb ironlounge && psql -d ironlounge -f supabase/schema.sql
+psql -d ironlounge -c "select set_admin_password('güçlü-bir-şifre')"
 postgrest local/postgrest.conf          # :3001
 cd public && python3 -m http.server 5500
 ```

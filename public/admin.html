@@ -20,9 +20,13 @@
   <form id="login-form" class="login-card">
     <img src="logo-dark.png" alt="Iron Lounge" class="login-logo">
     <p class="login-sub" id="login-sub">Yönetim Paneli</p>
-    <p class="login-note" id="setup-note" hidden>İlk kurulum: panel için bir admin şifresi belirleyin (en az 8 karakter).</p>
+    <div class="login-note" id="setup-note" hidden>
+      Admin şifresi henüz belirlenmemiş. Güvenlik için şifre panelden değil, veritabanından belirlenir.
+      Supabase'de <b>SQL Editor</b>'ı açıp şunu çalıştırın:
+      <code>select set_admin_password('güçlü-bir-şifre');</code>
+      Sonra bu sayfayı yenileyin.
+    </div>
     <input type="password" id="pw" placeholder="Admin şifresi" autocomplete="current-password" required>
-    <input type="password" id="pw2" placeholder="Şifre (tekrar)" autocomplete="new-password" hidden>
     <button class="btn primary" type="submit" id="login-btn">Giriş</button>
     <p class="msg err" id="login-err"></p>
   </form>
@@ -263,14 +267,10 @@ function toLocalInput(d) {
 const fromLocalInput = (v) => v ? new Date(v + ':00+03:00').toISOString() : null;
 
 // ---- Giriş ----
-let setupMode = false;
+// Şifre belirlenmemişse giriş formu yerine SQL Editor talimatı gösterilir
 function setSetupMode(on) {
-  setupMode = on;
-  $('setup-note').hidden = !on; $('pw2').hidden = !on; $('pw2').required = on;
+  $('setup-note').hidden = !on; $('pw').hidden = on; $('login-btn').hidden = on;
   $('login-sub').textContent = on ? 'İlk kurulum' : 'Yönetim Paneli';
-  $('login-btn').textContent = on ? 'Şifreyi belirle ve gir' : 'Giriş';
-  $('pw').placeholder = on ? 'Yeni admin şifresi' : 'Admin şifresi';
-  $('pw').autocomplete = on ? 'new-password' : 'current-password';
 }
 async function showLogin() {
   $('app').hidden = true; $('login').hidden = false;
@@ -280,15 +280,9 @@ async function showLogin() {
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
-    let res;
-    if (setupMode) {
-      if ($('pw').value !== $('pw2').value) throw new Error('Şifreler aynı değil');
-      res = await rpc('admin_setup', { p_password: $('pw').value });
-    } else {
-      res = await rpc('admin_login', { p_password: $('pw').value });
-      if (res.error) throw new Error(res.error);
-    }
-    setToken(res.token); $('pw').value = $('pw2').value = ''; $('login-err').textContent = ''; setSetupMode(false); boot();
+    const res = await rpc('admin_login', { p_password: $('pw').value });
+    if (res.error) throw new Error(res.error);
+    setToken(res.token); $('pw').value = ''; $('login-err').textContent = ''; boot();
   } catch (err) {
     if (err.message === 'SETUP_REQUIRED') { setSetupMode(true); $('login-err').textContent = ''; return; }
     $('login-err').textContent = err.message;

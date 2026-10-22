@@ -5,7 +5,8 @@
 -- Tablolar dışarıya tamamen kapalıdır (RLS açık + yetki yok).
 --
 -- Kurulum: Supabase > SQL Editor'a bu dosyanın tamamını yapıştırıp çalıştırın.
--- Admin şifresi yoktur: panel ilk açıldığında şifre belirleme ekranı gelir.
+-- Admin şifresi yoktur. Kurulumdan sonra SQL Editor'da bir kez çalıştırın:
+--   select set_admin_password('güçlü-bir-şifre');
 -- Dosya tekrar çalıştırılabilir (veriler silinmez, eski sürümden otomatik taşınır).
 -- =====================================================================
 
@@ -27,7 +28,7 @@ create table if not exists settings (
   lng            double precision not null,
   radius         int not null default 50
 );
--- Şifre boş başlar (bilinen bir varsayılan şifre yok); ilk girişte admin_setup ile belirlenir
+-- Şifre boş başlar (bilinen bir varsayılan şifre yok); set_admin_password ile SQL Editor'dan belirlenir
 alter table settings alter column admin_password drop not null;
 insert into settings (id, admin_password, lat, lng, radius)
 values (1, null, 41.018374, 29.089090, 50)
@@ -366,15 +367,26 @@ language sql stable security definer set search_path = public, extensions as $$
   select admin_password is null from settings where id = 1
 $$;
 
--- İlk kurulum: yalnızca şifre hiç belirlenmemişken çalışır
-create or replace function admin_setup(p_password text) returns json
+drop function if exists admin_setup(text);
+
+-- YALNIZCA SQL Editor'dan (veritabanı sahibi olarak) çalıştırılır; internete açık DEĞİLDİR.
+-- İlk kurulumda şifre belirler, şifre unutulursa sıfırlar; tüm oturumları ve kilitleri temizler.
+create or replace function set_admin_password(p_password text) returns text
 language plpgsql security definer set search_path = public, extensions as $$
 begin
   if length(coalesce(p_password, '')) < 8 then raise exception 'Şifre en az 8 karakter olmalı'; end if;
-  update settings set admin_password = crypt(p_password, gen_salt('bf')) where id = 1 and admin_password is null;
-  if not found then raise exception 'Admin şifresi zaten belirlenmiş'; end if;
-  return _new_admin_session();
+  update settings set admin_password = crypt(p_password, gen_salt('bf')) where id = 1;
+  delete from admin_sessions;
+  delete from failed_attempts where key like 'admin:%';
+  return 'Admin şifresi ayarlandı';
 end $$;
+
+-- YALNIZCA SQL Editor'dan: admin giriş kilidini kaldırır
+create or replace function admin_unlock() returns text
+language sql security definer set search_path = public, extensions as $$
+  delete from failed_attempts where key like 'admin:%';
+  select 'Admin giriş kilidi kaldırıldı';
+$$;
 
 -- Hata durumunda exception değil {error} döner: exception işlemi geri alır ve
 -- hatalı deneme kaydı da silinirdi (kaba kuvvet koruması çalışmazdı).
@@ -382,14 +394,16 @@ create or replace function admin_login(p_password text) returns json
 language plpgsql security definer set search_path = public, extensions as $$
 declare k text := 'admin:' || _client_key();
 begin
-  -- IP başına 8, IP'den bağımsız toplam 30 hatalı deneme / 15 dk
-  if _too_many_fails(k) or _too_many_fails('admin:*', 30) then
+  -- IP başına 8 hatalı deneme / 15 dk. Dağıtık saldırıya karşı: 15 dk içinde 50 FARKLI IP'den
+  -- hatalı deneme gelirse giriş geçici kapanır (tek kişi bunu tetikleyemez).
+  -- Kilit kalmazsa SQL Editor'da: select admin_unlock();
+  if _too_many_fails(k) or (select count(distinct key) >= 50 from failed_attempts
+                            where key like 'admin:%' and at > now() - interval '15 minutes') then
     return json_build_object('error', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.');
   end if;
   if admin_needs_setup() then return json_build_object('error', 'SETUP_REQUIRED'); end if;
   if not exists (select 1 from settings where id = 1 and admin_password = crypt(p_password, admin_password)) then
     perform _register_fail(k);
-    perform _register_fail('admin:*');
     return json_build_object('error', 'Şifre hatalı');
   end if;
   return _new_admin_session();
@@ -724,7 +738,6 @@ grant execute on function
   staff_status(text),
   staff_checkin(text, float8, float8, float8),
   admin_needs_setup(),
-  admin_setup(text),
   admin_login(text),
   admin_logout(text),
   admin_state(text),
