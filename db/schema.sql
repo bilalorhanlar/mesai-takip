@@ -164,13 +164,22 @@ drop function if exists admin_add_staff(text, text, bigint, numeric, int[]);
 -- yazdığı (sahte olabilir) değerdir; yedek olarak güvenilen proxy'nin eklediği en sağdaki değer kullanılır.
 create or replace function _client_key() returns text
 language plpgsql stable as $$
-declare h json; xff text[];
+declare h json; xff text[]; ip text;
 begin
   h := nullif(current_setting('request.headers', true), '')::json;
   if h is null then return 'global'; end if;
-  if nullif(h ->> 'x-client-ip', '') is not null then return h ->> 'x-client-ip'; end if;
-  xff := string_to_array(replace(coalesce(h ->> 'x-forwarded-for', ''), ' ', ''), ',');
-  return coalesce(nullif(xff[array_length(xff, 1)], ''), 'global');
+  ip := nullif(h ->> 'x-client-ip', '');
+  if ip is null then
+    xff := string_to_array(replace(coalesce(h ->> 'x-forwarded-for', ''), ' ', ''), ',');
+    ip := nullif(xff[array_length(xff, 1)], '');
+  end if;
+  if ip is null then return 'global'; end if;
+  -- IPv6: bir kullanıcının elinde koca bir /64 blok olur; sınır blok bazında uygulanır
+  begin
+    if family(ip::inet) = 6 then return host(set_masklen(ip::inet, 64)::cidr) || '/64'; end if;
+  exception when others then null;
+  end;
+  return ip;
 end $$;
 
 create or replace function _too_many_fails(p_key text, p_limit int default 8) returns boolean
@@ -211,7 +220,8 @@ language plpgsql security definer set search_path = public, extensions as $$
 declare c text;
 begin
   for i in 1..10000 loop
-    c := lpad((floor(random() * 10000))::int::text, 4, '0');
+    -- Kriptografik rastgelelik (random() tahmin edilebilir)
+    c := lpad(((('x' || encode(gen_random_bytes(4), 'hex'))::bit(32)::bigint) % 10000)::text, 4, '0');
     if not exists (select 1 from staff where code = c and not deleted) then return c; end if;
   end loop;
   raise exception 'Kullanılabilir kod kalmadı';
