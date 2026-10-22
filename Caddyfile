@@ -27,10 +27,18 @@
 
 	handle {
 		root * /srv
+		# Next.js statik çıktı: /admin -> admin.html
+		try_files {path} {path}.html {path}/index.html
 		file_server
 		header /*.html Cache-Control "no-cache"
 		header /config.js Cache-Control "no-cache"
 		header /db.js Cache-Control "no-cache"
+	}
+
+	handle_errors 404 {
+		root * /srv
+		rewrite * /404.html
+		file_server
 	}
 
 	header {
