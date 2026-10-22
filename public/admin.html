@@ -19,9 +19,11 @@
 <section id="login" class="login" hidden>
   <form id="login-form" class="login-card">
     <img src="logo-dark.png" alt="Iron Lounge" class="login-logo">
-    <p class="login-sub">Yönetim Paneli</p>
+    <p class="login-sub" id="login-sub">Yönetim Paneli</p>
+    <p class="login-note" id="setup-note" hidden>İlk kurulum: panel için bir admin şifresi belirleyin (en az 8 karakter).</p>
     <input type="password" id="pw" placeholder="Admin şifresi" autocomplete="current-password" required>
-    <button class="btn primary" type="submit">Giriş</button>
+    <input type="password" id="pw2" placeholder="Şifre (tekrar)" autocomplete="new-password" hidden>
+    <button class="btn primary" type="submit" id="login-btn">Giriş</button>
     <p class="msg err" id="login-err"></p>
   </form>
 </section>
@@ -162,7 +164,7 @@
       <h2>Admin şifresi</h2>
       <form class="card row-form" id="pw-form">
         <label>Mevcut şifre<input name="current" type="password" required autocomplete="current-password"></label>
-        <label>Yeni şifre<input name="next" type="password" minlength="6" required autocomplete="new-password"></label>
+        <label>Yeni şifre<input name="next" type="password" minlength="8" required autocomplete="new-password"></label>
         <button class="btn primary" type="submit">Değiştir</button>
       </form>
       <p class="msg" id="pw-msg"></p>
@@ -261,11 +263,36 @@ function toLocalInput(d) {
 const fromLocalInput = (v) => v ? new Date(v + ':00+03:00').toISOString() : null;
 
 // ---- Giriş ----
-function showLogin() { $('app').hidden = true; $('login').hidden = false; $('pw').focus(); }
+let setupMode = false;
+function setSetupMode(on) {
+  setupMode = on;
+  $('setup-note').hidden = !on; $('pw2').hidden = !on; $('pw2').required = on;
+  $('login-sub').textContent = on ? 'İlk kurulum' : 'Yönetim Paneli';
+  $('login-btn').textContent = on ? 'Şifreyi belirle ve gir' : 'Giriş';
+  $('pw').placeholder = on ? 'Yeni admin şifresi' : 'Admin şifresi';
+  $('pw').autocomplete = on ? 'new-password' : 'current-password';
+}
+async function showLogin() {
+  $('app').hidden = true; $('login').hidden = false;
+  try { setSetupMode(await rpc('admin_needs_setup')); } catch { /* bağlantı hatası girişte görünür */ }
+  $('pw').focus();
+}
 $('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  try { const { token } = await rpc('admin_login', { p_password: $('pw').value }); setToken(token); $('pw').value = ''; $('login-err').textContent = ''; boot(); }
-  catch (err) { $('login-err').textContent = err.message; }
+  try {
+    let res;
+    if (setupMode) {
+      if ($('pw').value !== $('pw2').value) throw new Error('Şifreler aynı değil');
+      res = await rpc('admin_setup', { p_password: $('pw').value });
+    } else {
+      res = await rpc('admin_login', { p_password: $('pw').value });
+      if (res.error) throw new Error(res.error);
+    }
+    setToken(res.token); $('pw').value = $('pw2').value = ''; $('login-err').textContent = ''; setSetupMode(false); boot();
+  } catch (err) {
+    if (err.message === 'SETUP_REQUIRED') { setSetupMode(true); $('login-err').textContent = ''; return; }
+    $('login-err').textContent = err.message;
+  }
 });
 $('logout').addEventListener('click', async () => { await rpc('admin_logout', { p_token: getToken() }).catch(() => {}); setToken(null); showLogin(); });
 

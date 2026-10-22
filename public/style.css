@@ -402,3 +402,5 @@ button.c:hover { transform: scale(1.15); box-shadow: 0 4px 12px rgba(25,28,22,.1
 .stat b.money { font-size: 26px; }
 .tbl.pay b.big { font-size: 17px; }
 @media (max-width: 640px) { .stat b.money { font-size: 19px; } }
+
+.login-note { margin: -4px 0 4px; font-size: 13px; color: var(--muted); line-height: 1.5; }

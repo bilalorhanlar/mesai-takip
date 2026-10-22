@@ -5,7 +5,7 @@
 -- Tablolar dışarıya tamamen kapalıdır (RLS açık + yetki yok).
 --
 -- Kurulum: Supabase > SQL Editor'a bu dosyanın tamamını yapıştırıp çalıştırın.
--- Varsayılan admin şifresi: admin1234  (panelden hemen değiştirin)
+-- Admin şifresi yoktur: panel ilk açıldığında şifre belirleme ekranı gelir.
 -- Dosya tekrar çalıştırılabilir (veriler silinmez, eski sürümden otomatik taşınır).
 -- =====================================================================
 
@@ -22,13 +22,15 @@ end $$;
 -- ---------------------------------------------------------------------
 create table if not exists settings (
   id             int primary key default 1 check (id = 1),
-  admin_password text not null,
+  admin_password text,
   lat            double precision not null,
   lng            double precision not null,
   radius         int not null default 50
 );
+-- Şifre boş başlar (bilinen bir varsayılan şifre yok); ilk girişte admin_setup ile belirlenir
+alter table settings alter column admin_password drop not null;
 insert into settings (id, admin_password, lat, lng, radius)
-values (1, crypt('admin1234', gen_salt('bf')), 41.018374, 29.089090, 50)
+values (1, null, 41.018374, 29.089090, 50)
 on conflict (id) do nothing;
 
 -- Vardiya tanımları (istenildiği kadar)
@@ -149,22 +151,29 @@ drop function if exists admin_update_staff(text, bigint, text, time, time, int[]
 drop function if exists _staff_json(staff);
 drop function if exists _record_json(records);
 drop function if exists _on_leave(staff, date);
+drop function if exists _too_many_fails(text);
 drop function if exists admin_regen_code(text, bigint);
 drop function if exists admin_add_staff(text, text, bigint, numeric, int[]);
 
 -- ---------------------------------------------------------------------
 -- Yardımcı (dahili) fonksiyonlar
 -- ---------------------------------------------------------------------
+-- İstemci IP'si. X-Forwarded-For'un en soldaki değeri istemcinin kendi yazdığı (sahte olabilir) değerdir;
+-- bu yüzden Cloudflare'in koyduğu cf-connecting-ip, yoksa güvenilen proxy'nin eklediği en sağdaki değer kullanılır.
 create or replace function _client_key() returns text
-language sql stable as $$
-  select coalesce(
-    split_part(nullif(current_setting('request.headers', true), '')::json ->> 'x-forwarded-for', ',', 1),
-    'global')
-$$;
+language plpgsql stable as $$
+declare h json; xff text[];
+begin
+  h := nullif(current_setting('request.headers', true), '')::json;
+  if h is null then return 'global'; end if;
+  if nullif(h ->> 'cf-connecting-ip', '') is not null then return h ->> 'cf-connecting-ip'; end if;
+  xff := string_to_array(replace(coalesce(h ->> 'x-forwarded-for', ''), ' ', ''), ',');
+  return coalesce(nullif(xff[array_length(xff, 1)], ''), 'global');
+end $$;
 
-create or replace function _too_many_fails(p_key text) returns boolean
+create or replace function _too_many_fails(p_key text, p_limit int default 8) returns boolean
 language sql stable security definer set search_path = public, extensions as $$
-  select count(*) >= 8 from failed_attempts where key = p_key and at > now() - interval '15 minutes'
+  select count(*) >= p_limit from failed_attempts where key = p_key and at > now() - interval '15 minutes'
 $$;
 
 create or replace function _register_fail(p_key text) returns void
@@ -342,19 +351,48 @@ end $$;
 -- ---------------------------------------------------------------------
 -- ADMIN fonksiyonları (token ile)
 -- ---------------------------------------------------------------------
-create or replace function admin_login(p_password text) returns json
+create or replace function _new_admin_session() returns json
 language plpgsql security definer set search_path = public, extensions as $$
-declare t text; k text := 'admin:' || _client_key();
+declare t text := encode(gen_random_bytes(32), 'hex');
 begin
-  if _too_many_fails(k) then raise exception 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.'; end if;
-  if not exists (select 1 from settings where id = 1 and admin_password = crypt(p_password, admin_password)) then
-    perform _register_fail(k);
-    raise exception 'Şifre hatalı';
-  end if;
   delete from admin_sessions where expires_at < now();
-  t := encode(gen_random_bytes(32), 'hex');
   insert into admin_sessions values (t, now() + interval '12 hours');
   return json_build_object('token', t);
+end $$;
+
+-- Admin şifresi henüz belirlenmemiş mi? (ilk kurulum ekranı için)
+create or replace function admin_needs_setup() returns boolean
+language sql stable security definer set search_path = public, extensions as $$
+  select admin_password is null from settings where id = 1
+$$;
+
+-- İlk kurulum: yalnızca şifre hiç belirlenmemişken çalışır
+create or replace function admin_setup(p_password text) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if length(coalesce(p_password, '')) < 8 then raise exception 'Şifre en az 8 karakter olmalı'; end if;
+  update settings set admin_password = crypt(p_password, gen_salt('bf')) where id = 1 and admin_password is null;
+  if not found then raise exception 'Admin şifresi zaten belirlenmiş'; end if;
+  return _new_admin_session();
+end $$;
+
+-- Hata durumunda exception değil {error} döner: exception işlemi geri alır ve
+-- hatalı deneme kaydı da silinirdi (kaba kuvvet koruması çalışmazdı).
+create or replace function admin_login(p_password text) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare k text := 'admin:' || _client_key();
+begin
+  -- IP başına 8, IP'den bağımsız toplam 30 hatalı deneme / 15 dk
+  if _too_many_fails(k) or _too_many_fails('admin:*', 30) then
+    return json_build_object('error', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.');
+  end if;
+  if admin_needs_setup() then return json_build_object('error', 'SETUP_REQUIRED'); end if;
+  if not exists (select 1 from settings where id = 1 and admin_password = crypt(p_password, admin_password)) then
+    perform _register_fail(k);
+    perform _register_fail('admin:*');
+    return json_build_object('error', 'Şifre hatalı');
+  end if;
+  return _new_admin_session();
 end $$;
 
 create or replace function admin_logout(p_token text) returns void
@@ -602,7 +640,7 @@ begin
   if not exists (select 1 from settings where id = 1 and admin_password = crypt(p_current, admin_password)) then
     raise exception 'Mevcut şifre hatalı';
   end if;
-  if length(coalesce(p_next, '')) < 6 then raise exception 'Yeni şifre en az 6 karakter olmalı'; end if;
+  if length(coalesce(p_next, '')) < 8 then raise exception 'Yeni şifre en az 8 karakter olmalı'; end if;
   update settings set admin_password = crypt(p_next, gen_salt('bf')) where id = 1;
   delete from admin_sessions where token <> p_token; -- diğer oturumları kapat
 end $$;
@@ -685,6 +723,8 @@ revoke execute on all functions in schema public from public, anon, authenticate
 grant execute on function
   staff_status(text),
   staff_checkin(text, float8, float8, float8),
+  admin_needs_setup(),
+  admin_setup(text),
   admin_login(text),
   admin_logout(text),
   admin_state(text),

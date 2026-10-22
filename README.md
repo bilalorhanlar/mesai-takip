@@ -7,7 +7,8 @@ SQL fonksiyonlarında çalışır. Tablolar dışarıya kapalıdır; tarayıcı 
 ## Sayfalar
 - `index.html` — Personel ekranı. İlk açılışta 4 haneli kod girilir, telefon kişiyi hatırlar.
   Sonra tek bir **Mesaiye Başla** butonu var; işyerine 50 m'den uzaksa giriş yapılamaz.
-- `admin.html` — Yönetim paneli (varsayılan şifre `admin1234`, ilk girişte **Ayarlar**'dan değiştirin).
+- `admin.html` — Yönetim paneli. Varsayılan şifre yok: panel ilk açıldığında admin şifresini siz belirlersiniz
+  (kurulumdan hemen sonra açıp belirleyin).
   - **Şu An:** kim mesaide, bugünkü hakediş, çıkış yaptırma, gerekirse konumsuz manuel giriş
   - **Personel:** ekle; giriş kodu elle (4 hane) ya da otomatik; varsayılan vardiya, saatlik ücret, haftalık izin günleri
   - **Vardiyalar:** istediğin kadar vardiya (ad, başlangıç, bitiş; gece yarısını geçebilir)
