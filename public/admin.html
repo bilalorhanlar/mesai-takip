@@ -22,7 +22,7 @@
     <p class="login-sub" id="login-sub">Yönetim Paneli</p>
     <div class="login-note" id="setup-note" hidden>
       Admin şifresi henüz belirlenmemiş. Güvenlik için şifre panelden değil, veritabanından belirlenir.
-      Supabase'de <b>SQL Editor</b>'ı açıp şunu çalıştırın:
+      Bilgisayarınızda proje klasöründe <code>railway connect Postgres</code> çalıştırın, açılan ekrana şunu yazın:
       <code>select set_admin_password('güçlü-bir-şifre');</code>
       Sonra bu sayfayı yenileyin.
     </div>
@@ -267,7 +267,7 @@ function toLocalInput(d) {
 const fromLocalInput = (v) => v ? new Date(v + ':00+03:00').toISOString() : null;
 
 // ---- Giriş ----
-// Şifre belirlenmemişse giriş formu yerine SQL Editor talimatı gösterilir
+// Şifre belirlenmemişse giriş formu yerine veritabanı talimatı gösterilir
 function setSetupMode(on) {
   $('setup-note').hidden = !on; $('pw').hidden = on; $('login-btn').hidden = on;
   $('login-sub').textContent = on ? 'İlk kurulum' : 'Yönetim Paneli';

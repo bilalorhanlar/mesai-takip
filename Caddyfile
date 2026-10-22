@@ -1,0 +1,42 @@
+# Iron Lounge web sunucusu: sayfaları sunar, /api isteklerini PostgREST'e iletir.
+{
+	admin off
+	servers {
+		# Railway'in kenar sunucusu (özel ağ) güvenilir; gerçek istemci IP'si X-Forwarded-For'dan
+		# sağdan sola, güvenilir olmayan ilk adres olarak alınır (istemcinin sahte değeri atlanır).
+		trusted_proxies static private_ranges 100.64.0.0/10
+		trusted_proxies_strict
+	}
+}
+
+:{$PORT:8080} {
+	encode gzip
+
+	handle_path /api/* {
+		# Sadece SQL fonksiyonları (rpc) dışarı açık; tablo uçları kapalı
+		@notrpc not path /rpc/*
+		respond @notrpc 404
+
+		reverse_proxy {$API_UPSTREAM:localhost:3000} {
+			# Gerçek IP'yi veritabanına ilet; istemcinin gönderdiği sahte başlıkları ez/sil
+			header_up X-Client-IP {client_ip}
+			header_up -Cf-Connecting-Ip
+			header_up -X-Real-Ip
+		}
+	}
+
+	handle {
+		root * /srv
+		file_server
+		header /*.html Cache-Control "no-cache"
+		header /config.js Cache-Control "no-cache"
+		header /db.js Cache-Control "no-cache"
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		X-Frame-Options DENY
+		Permissions-Policy "geolocation=(self), camera=(), microphone=()"
+	}
+}

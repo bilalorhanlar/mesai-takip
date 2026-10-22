@@ -1,13 +1,9 @@
-// PostgreSQL'e (Supabase / PostgREST) doğrudan RPC çağrısı. Ayrı backend yok.
+// PostgreSQL'e PostgREST üzerinden doğrudan RPC çağrısı. Ayrı backend yok.
 async function rpc(fn, args = {}) {
-  const { SUPABASE_URL, SUPABASE_ANON_KEY: key, REST_URL } = window.IRON_CONFIG || {};
-  // Supabase: <url>/rest/v1 · Kendi PostgREST sunucunuz: REST_URL
-  const base = (REST_URL || `${SUPABASE_URL}/rest/v1`).replace(/\/$/, '');
-  const headers = { 'Content-Type': 'application/json', apikey: key };
-  if (key && key.startsWith('eyJ')) headers.Authorization = 'Bearer ' + key; // eski JWT tipi anon key
+  const base = (window.IRON_CONFIG?.REST_URL || '/api').replace(/\/$/, '');
   let r;
   try {
-    r = await fetch(`${base}/rpc/${fn}`, { method: 'POST', headers, body: JSON.stringify(args) });
+    r = await fetch(`${base}/rpc/${fn}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(args) });
   } catch {
     throw new Error('Sunucuya bağlanılamadı. İnternet bağlantınızı kontrol edin.');
   }

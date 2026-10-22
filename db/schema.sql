@@ -1,18 +1,18 @@
 -- =====================================================================
 -- Iron Lounge — Mesai Takip  ·  PostgreSQL şeması
 -- Backend yok: tüm iş mantığı bu SQL fonksiyonlarında.
--- Frontend, PostgREST (Supabase) üzerinden yalnızca bu fonksiyonları çağırır.
+-- Frontend, PostgREST üzerinden yalnızca bu fonksiyonları çağırır.
 -- Tablolar dışarıya tamamen kapalıdır (RLS açık + yetki yok).
 --
--- Kurulum: Supabase > SQL Editor'a bu dosyanın tamamını yapıştırıp çalıştırın.
--- Admin şifresi yoktur. Kurulumdan sonra SQL Editor'da bir kez çalıştırın:
+-- Kurulum: psql "$DATABASE_URL" -f db/schema.sql
+-- Admin şifresi yoktur. Kurulumdan sonra veritabanında (psql) bir kez çalıştırın:
 --   select set_admin_password('güçlü-bir-şifre');
 -- Dosya tekrar çalıştırılabilir (veriler silinmez, eski sürümden otomatik taşınır).
 -- =====================================================================
 
 create extension if not exists pgcrypto;
 
--- PostgREST rolleri Supabase'de hazırdır; düz PostgreSQL'de yoksa oluştur.
+-- PostgREST rolleri: anon (internetten gelen her istek bu rolle çalışır).
 do $$ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if;
   if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if;
@@ -28,7 +28,7 @@ create table if not exists settings (
   lng            double precision not null,
   radius         int not null default 50
 );
--- Şifre boş başlar (bilinen bir varsayılan şifre yok); set_admin_password ile SQL Editor'dan belirlenir
+-- Şifre boş başlar (bilinen bir varsayılan şifre yok); set_admin_password ile veritabanından belirlenir
 alter table settings alter column admin_password drop not null;
 insert into settings (id, admin_password, lat, lng, radius)
 values (1, null, 41.018374, 29.089090, 50)
@@ -159,15 +159,16 @@ drop function if exists admin_add_staff(text, text, bigint, numeric, int[]);
 -- ---------------------------------------------------------------------
 -- Yardımcı (dahili) fonksiyonlar
 -- ---------------------------------------------------------------------
--- İstemci IP'si. X-Forwarded-For'un en soldaki değeri istemcinin kendi yazdığı (sahte olabilir) değerdir;
--- bu yüzden Cloudflare'in koyduğu cf-connecting-ip, yoksa güvenilen proxy'nin eklediği en sağdaki değer kullanılır.
+-- İstemci IP'si. Önünde duran web sunucusu (Caddyfile) gerçek IP'yi X-Client-IP başlığına yazar ve
+-- istemcinin gönderdiği aynı adlı başlığı ezer. X-Forwarded-For'un en soldaki değeri istemcinin kendi
+-- yazdığı (sahte olabilir) değerdir; yedek olarak güvenilen proxy'nin eklediği en sağdaki değer kullanılır.
 create or replace function _client_key() returns text
 language plpgsql stable as $$
 declare h json; xff text[];
 begin
   h := nullif(current_setting('request.headers', true), '')::json;
   if h is null then return 'global'; end if;
-  if nullif(h ->> 'cf-connecting-ip', '') is not null then return h ->> 'cf-connecting-ip'; end if;
+  if nullif(h ->> 'x-client-ip', '') is not null then return h ->> 'x-client-ip'; end if;
   xff := string_to_array(replace(coalesce(h ->> 'x-forwarded-for', ''), ' ', ''), ',');
   return coalesce(nullif(xff[array_length(xff, 1)], ''), 'global');
 end $$;
@@ -369,7 +370,7 @@ $$;
 
 drop function if exists admin_setup(text);
 
--- YALNIZCA SQL Editor'dan (veritabanı sahibi olarak) çalıştırılır; internete açık DEĞİLDİR.
+-- YALNIZCA veritabanından (psql, sahibi olarak) çalıştırılır; internete açık DEĞİLDİR.
 -- İlk kurulumda şifre belirler, şifre unutulursa sıfırlar; tüm oturumları ve kilitleri temizler.
 create or replace function set_admin_password(p_password text) returns text
 language plpgsql security definer set search_path = public, extensions as $$
@@ -381,7 +382,7 @@ begin
   return 'Admin şifresi ayarlandı';
 end $$;
 
--- YALNIZCA SQL Editor'dan: admin giriş kilidini kaldırır
+-- YALNIZCA veritabanından: admin giriş kilidini kaldırır
 create or replace function admin_unlock() returns text
 language sql security definer set search_path = public, extensions as $$
   delete from failed_attempts where key like 'admin:%';
@@ -396,7 +397,7 @@ declare k text := 'admin:' || _client_key();
 begin
   -- IP başına 8 hatalı deneme / 15 dk. Dağıtık saldırıya karşı: 15 dk içinde 50 FARKLI IP'den
   -- hatalı deneme gelirse giriş geçici kapanır (tek kişi bunu tetikleyemez).
-  -- Kilit kalmazsa SQL Editor'da: select admin_unlock();
+  -- Kilit kalmazsa veritabanında: select admin_unlock();
   if _too_many_fails(k) or (select count(distinct key) >= 50 from failed_attempts
                             where key like 'admin:%' and at > now() - interval '15 minutes') then
     return json_build_object('error', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.');

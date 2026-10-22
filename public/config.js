@@ -1,14 +1,8 @@
-// Veritabanı bağlantısı — Supabase > Project Settings > API (veya Data API) sayfasından alın.
-// anon / publishable anahtarın herkese açık olması sorun değil: tablolar kapalı,
-// sadece schema.sql'deki fonksiyonlar çağrılabilir.
-window.IRON_CONFIG = {
-  SUPABASE_URL: 'https://PROJE-ID.supabase.co',
-  SUPABASE_ANON_KEY: 'BURAYA-ANON-KEY',
-  // Supabase yerine kendi PostgREST sunucunuzu kullanırsanız:
-  // REST_URL: 'https://api.alanadiniz.com',
-};
+// API adresi. Canlıda site ve API aynı adreste: web sunucusu (Caddyfile) /api isteklerini
+// PostgREST'e iletir. Bu yüzden burada gizli bir anahtar ya da adres yoktur.
+window.IRON_CONFIG = { REST_URL: '/api' };
 
-// Lokal geliştirme: localhost'ta açılınca yerel PostgREST'e bağlan
-if (['localhost', '127.0.0.1'].includes(location.hostname)) {
-  window.IRON_CONFIG = { REST_URL: 'http://localhost:3001', SUPABASE_ANON_KEY: 'local' };
+// Lokal geliştirme: python3 -m http.server ile açılınca yerel PostgREST'e bağlan
+if (['localhost', '127.0.0.1'].includes(location.hostname) && location.port !== '8080') {
+  window.IRON_CONFIG = { REST_URL: 'http://localhost:3001' };
 }
