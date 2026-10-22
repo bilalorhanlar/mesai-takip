@@ -1,13 +1,26 @@
 # Iron Lounge · Mesai Takip
 
-Ayrı bir backend kodu yok: **statik sayfalar (`public/`) + PostgreSQL (`db/schema.sql`) + PostgREST**.
+Ayrı bir backend kodu yok: **Next.js (statik çıktı) + PostgreSQL (`db/schema.sql`) + PostgREST**.
 Tüm kurallar (50 m konum kontrolü, 4 haneli kodlar, geç kalma, hakediş, admin oturumu) veritabanındaki
 SQL fonksiyonlarında çalışır. Tablolar dışarıya kapalıdır; tarayıcı sadece bu fonksiyonları çağırabilir.
+
+## Proje yapısı
+```
+app/page.js            Personel ekranı (/)
+app/admin/page.js      Yönetim paneli (/admin)
+app/globals.css        Tasarım sistemi
+components/StaffApp.js Personel ekranı bileşenleri
+components/admin/      Panel sekmeleri ve diyaloglar
+lib/api.js             PostgREST RPC çağrısı
+lib/format.js          Tarih, süre, para biçimleri
+db/schema.sql          Tüm veri ve iş kuralları (SQL fonksiyonları)
+Dockerfile, Caddyfile  Canlı yayın: Next.js derlenir, Caddy sunar ve /api'yi PostgREST'e iletir
+```
 
 ## Sayfalar
 - `/` — Personel ekranı. İlk açılışta 4 haneli kod girilir, telefon kişiyi hatırlar.
   Sonra tek bir **Mesaiye Başla** butonu var; işyerine 50 m'den uzaksa giriş yapılamaz.
-- `/admin.html` — Yönetim paneli.
+- `/admin` — Yönetim paneli.
   - **Şu An:** kim mesaide, bugünkü hakediş, çıkış yaptırma, gerekirse konumsuz manuel giriş
   - **Personel:** ekle; giriş kodu elle (4 hane) ya da otomatik; varsayılan vardiya, saatlik ücret, haftalık izin günleri
   - **Vardiyalar:** istediğin kadar vardiya (ad, başlangıç, bitiş; gece yarısını geçebilir)
@@ -23,7 +36,7 @@ değiştirmek geçmiş günlerin geç kalma ve hakediş hesabını bozmaz.
 ## Railway'de yapı
 | Servis | Ne yapar |
 |---|---|
-| **mesai-takip** | Bu depodan `Dockerfile` ile derlenir. Caddy sayfaları sunar, `/api/rpc/*` isteklerini `api` servisine iletir ve gerçek istemci IP'sini `X-Client-IP` başlığıyla veritabanına geçirir. Her `git push` ile otomatik yayınlanır. |
+| **mesai-takip** | Bu depodan `Dockerfile` ile derlenir (Next.js statik çıktı). Caddy sayfaları sunar, `/api/rpc/*` isteklerini `api` servisine iletir ve gerçek istemci IP'sini `X-Client-IP` başlığıyla veritabanına geçirir. Her `git push` ile otomatik yayınlanır. |
 | **api** | `postgrest/postgrest` imajı. İnternete açık değil, sadece özel ağdan erişilir. `authenticator` rolüyle bağlanır, istekleri `anon` rolüyle çalıştırır. |
 | **Postgres** | Veriler. |
 
@@ -48,12 +61,14 @@ psql "$DATABASE_PUBLIC_URL" -f db/schema.sql
 ## Lokal çalıştırma
 PostgreSQL + PostgREST kurulu olmalı (`brew install postgresql@18 postgrest`).
 ```
+npm install
 createdb ironlounge && psql -d ironlounge -f db/schema.sql
 psql -d ironlounge -c "select set_admin_password('güçlü-bir-şifre')"
 postgrest local/postgrest.conf          # :3001
-cd public && python3 -m http.server 5500
+npm run dev                             # http://localhost:3000
 ```
-`localhost`'ta açılınca `config.js` otomatik olarak yerel PostgREST'e bağlanır.
+API adresi `NEXT_PUBLIC_API_URL` ile verilir: lokalde `.env.development` (localhost:3001),
+canlıda varsayılan `/api` (Caddy iletir). Gizli anahtar yok.
 
 ## Notlar
 - Telefonlar konum iznini yalnızca `https://` sitelerde verir (Railway alan adı HTTPS'tir).
