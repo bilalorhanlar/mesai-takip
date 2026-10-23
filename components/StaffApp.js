@@ -31,6 +31,7 @@ const Icon = ({ name }) => (
     {name === 'play' && <><circle cx="12" cy="12" r="9" /><path d="M10 8.5v7l5.5-3.5z" /></>}
     {name === 'pin' && <><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z" /><circle cx="12" cy="10" r="2.3" /></>}
     {name === 'check' && <><circle cx="12" cy="12" r="9" /><path d="M8 12.5l2.8 2.8L16.5 9.5" /></>}
+    {name === 'stop' && <><circle cx="12" cy="12" r="9" /><rect x="9" y="9" width="6" height="6" rx="1" /></>}
   </svg>
 );
 
@@ -93,7 +94,7 @@ function CodeView({ onIdentified, initialError }) {
 // ---- Başarı animasyonu ----
 const CONFETTI_COLORS = ['#3b4a2c', '#9a9364', '#d8d2ad', '#56663f', '#c9c3a0'];
 // Gizlilik: geç kalma, vardiya vb. gösterilmez; sadece onay
-function SuccessView({ name }) {
+function SuccessView({ name, out = false }) {
   const [at] = useState(() => new Date().toISOString());
   const [pieces] = useState(() => Array.from({ length: 26 }, (_, i) => {
     const a = (Math.PI * 2 * i) / 26 + Math.random() * 0.3, dist = 110 + Math.random() * 90;
@@ -110,18 +111,21 @@ function SuccessView({ name }) {
           <circle className="close" cx="100" cy="100" r="88" />
           <path className="tick" d="M70 103 l22 22 l40 -46" />
         </svg>
-        {pieces.map((style, i) => <span key={i} className="confetti" style={style} />)}
+        {!out && pieces.map((style, i) => <span key={i} className="confetti" style={style} />)}
       </div>
-      <p className="ok-title">İyi çalışmalar, {firstName(name)}</p>
+      <p className="ok-title">{out ? 'İyi dinlenmeler' : 'İyi çalışmalar'}, {firstName(name)}</p>
       <p className="ok-time">{tFmt(at)}</p>
-      <p className="ok-sub">Girişiniz kaydedildi</p>
+      <p className="ok-sub">{out ? 'Çıkışınız kaydedildi' : 'Girişiniz kaydedildi'}</p>
     </section>
   );
 }
 
 // ---- Mesaiye başla ----
-function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
+function MainView({ info, onCheckedIn, onCheckedOut, onInvalidCode, onShiftUpdate }) {
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false); // çıkış: yanlışlıkla basılmasın diye ikinci dokunuş
+  const confirmTimer = useRef(null);
+  useEffect(() => () => clearTimeout(confirmTimer.current), []);
   const [failed, setFailed] = useState(false);
   const [msg, setMsg] = useState(null);
   const on = !!info.onShift;
@@ -131,16 +135,24 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
 
   const start = async () => {
     const me = getMe(); if (!me) return onInvalidCode();
+    // Mesaideyken ilk dokunuş sadece onay ister
+    if (on && !confirming) {
+      buzz(10); setMsg(null); setConfirming(true);
+      confirmTimer.current = setTimeout(() => setConfirming(false), 4000);
+      return;
+    }
+    clearTimeout(confirmTimer.current); setConfirming(false);
     buzz(15);
     setBusy(true); setMsg(null);
     try {
       const pos = await getPosition();
-      const { ok, status, data } = await call('staff_checkin', { p_code: me.code, p_lat: pos.coords.latitude, p_lng: pos.coords.longitude, p_accuracy: pos.coords.accuracy });
-      setBusy(false);
-      if (ok) return onCheckedIn(data);
+      const args = { p_code: me.code, p_lat: pos.coords.latitude, p_lng: pos.coords.longitude, p_accuracy: pos.coords.accuracy };
+      const { ok, status, data } = await call(on ? 'staff_checkout' : 'staff_checkin', args);
+      setBusy(false); setFailed(false);
+      if (ok) return on ? onCheckedOut(data) : onCheckedIn(data);
       if (status === 404) return onInvalidCode('Kodunuz geçersiz, tekrar girin.');
-      if (status === 409) return onShiftUpdate({ onShift: true });
-      throw new Error(data.error || 'Giriş yapılamadı');
+      if (status === 409) return onShiftUpdate({ onShift: !on });
+      throw new Error(data.error || (on ? 'Çıkış yapılamadı' : 'Giriş yapılamadı'));
     } catch (e) {
       setBusy(false); setFailed(true);
       buzz([40, 40, 40]);
@@ -155,11 +167,15 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
         <svg className="stroke-ring" viewBox="0 0 240 240" aria-hidden="true">
           <circle className="arc" cx="120" cy="120" r="112" />
         </svg>
-        <button className={`start${on ? ' done' : ''}${busy ? ' busy' : ''}`} disabled={on || busy} onClick={start}>
-          <Icon name={on ? 'check' : busy ? 'pin' : 'play'} />
+        <button className={`start${on ? ' done' : ''}${busy ? ' busy' : ''}${confirming ? ' confirm' : ''}`} disabled={busy} onClick={start}>
+          <Icon name={busy ? 'pin' : on ? 'stop' : 'play'} />
           <span className="lbl">
-            {on ? 'Mesaidesiniz' : busy ? <>Konum<br />alınıyor</> : failed ? <>Tekrar<br />dene</> : <>Mesaiye<br />başla</>}
+            {busy ? <>Konum<br />alınıyor</>
+              : confirming ? <>Onaylamak için<br />tekrar dokunun</>
+              : on ? (failed ? <>Tekrar<br />dene</> : <>Mesaiyi<br />bitir</>)
+              : failed ? <>Tekrar<br />dene</> : <>Mesaiye<br />başla</>}
           </span>
+          {on && !busy && !confirming && <span className="sub">Mesaidesiniz</span>}
         </button>
       </div>
       <p className={`msg${note?.err ? ' err' : ''}`}>{note?.text}</p>
@@ -193,8 +209,13 @@ export default function StaffApp() {
   }, [refresh]);
 
   const onCheckedIn = (data) => {
-    setOkData(data); setView('ok');
+    setOkData({ ...data, out: false }); setView('ok');
     buzz([30, 60, 80]);
+    okTimer.current = setTimeout(refresh, 7000);
+  };
+  const onCheckedOut = (data) => {
+    setOkData({ ...data, out: true }); setView('ok');
+    buzz([30, 60]);
     okTimer.current = setTimeout(refresh, 7000);
   };
 
@@ -208,10 +229,10 @@ export default function StaffApp() {
         <div className="staff-body">
           {view === 'code' && <CodeView initialError={codeError} onIdentified={(d) => { setInfo(d); setView('main'); }} />}
           {view === 'main' && info && (
-            <MainView info={info} onCheckedIn={onCheckedIn} onInvalidCode={toCode}
+            <MainView info={info} onCheckedIn={onCheckedIn} onCheckedOut={onCheckedOut} onInvalidCode={toCode}
               onShiftUpdate={(u) => setInfo((i) => ({ ...i, ...u }))} />
           )}
-          {view === 'ok' && okData && <SuccessView name={okData.name || info?.name || ''} />}
+          {view === 'ok' && okData && <SuccessView out={okData.out} name={okData.name || info?.name || ''} />}
         </div>
       </main>
     </div>

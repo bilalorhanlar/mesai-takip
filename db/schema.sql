@@ -420,6 +420,28 @@ begin
   return json_build_object('status', 200, 'name', split_part(s.name, ' ', 1));
 end $$;
 
+-- Personel çıkışı: giriş gibi işyerinde (konum kontrolüyle) yapılır. Gizlilik: sadece onay döner.
+create or replace function staff_checkout(p_code text, p_lat float8, p_lng float8, p_accuracy float8 default null) returns json
+language plpgsql security definer set search_path = public, extensions as $$
+declare s staff; st settings; r records; k text := 'staff:' || _client_key();
+begin
+  if _too_many_fails(k) then return json_build_object('status', 429, 'error', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.'); end if;
+  select * into s from staff where code = p_code and not deleted;
+  if not found then
+    perform _register_fail(k);
+    return json_build_object('status', 404, 'error', 'Kod bulunamadı');
+  end if;
+  if p_lat is null or p_lng is null then return json_build_object('status', 400, 'error', 'Konum alınamadı'); end if;
+  select * into st from settings where id = 1;
+  if _distance_m(p_lat, p_lng, st.lat, st.lng) > st.radius then
+    return json_build_object('status', 403, 'error', 'İşyerinde değilsiniz. Çıkış sadece işyerinden yapılabilir.');
+  end if;
+  select * into r from records where staff_id = s.id and check_out is null;
+  if not found then return json_build_object('status', 409, 'error', 'Açık mesainiz yok'); end if;
+  perform _close_record(r.id, now());
+  return json_build_object('status', 200, 'name', split_part(s.name, ' ', 1));
+end $$;
+
 -- ---------------------------------------------------------------------
 -- ADMIN fonksiyonları (token ile)
 -- ---------------------------------------------------------------------
@@ -689,12 +711,12 @@ begin
   values (s.id, r.check_in, r.late, true, r.shift_id, r.shift_name, r.shift_start, r.shift_end, r.part_time, r.shift_auto, s.hourly_rate);
 end $$;
 
-create or replace function admin_checkout(p_token text, p_record bigint, p_time timestamptz default null) returns void
+-- Açık kaydı kapatır (admin ve personel çıkışı ortak)
+create or replace function _close_record(p_record bigint, p_time timestamptz) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare r records; t timestamptz := coalesce(p_time, now());
 begin
-  perform _assert_admin(p_token);
-  select * into r from records where id = p_record;
+  select * into r from records where id = p_record for update;
   if not found then raise exception 'Kayıt bulunamadı'; end if;
   if r.check_out is not null then raise exception 'Çıkış zaten yapılmış'; end if;
   if r.check_in - t >= interval '1 minute' then raise exception 'Çıkış saati girişten önce olamaz'; end if;
@@ -704,6 +726,13 @@ begin
   update records set check_out = r.check_out, late = r.late, shift_id = r.shift_id, shift_name = r.shift_name,
     shift_start = r.shift_start, shift_end = r.shift_end, part_time = r.part_time, shift_auto = r.shift_auto
   where id = p_record;
+end $$;
+
+create or replace function admin_checkout(p_token text, p_record bigint, p_time timestamptz default null) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  perform _assert_admin(p_token);
+  perform _close_record(p_record, p_time);
 end $$;
 
 -- Kayıt ekle (p_id null) veya düzenle. Geç kalma, seçilen vardiyaya göre yeniden hesaplanır.
@@ -871,6 +900,7 @@ revoke execute on all functions in schema public from public, anon, authenticate
 grant execute on function
   staff_status(text),
   staff_checkin(text, float8, float8, float8),
+  staff_checkout(text, float8, float8, float8),
   admin_needs_setup(),
   admin_login(text),
   admin_logout(text),

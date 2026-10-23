@@ -109,8 +109,13 @@ input:focus-visible, select:focus-visible { outline: none; }
 .start .lbl { font-size: 21px; font-weight: 500; line-height: 1.2; text-align: center; }
 .start .sub { font-size: 13px; color: var(--muted); }
 .start.busy { background: var(--olive-2); }
-.start.done { background: var(--paper); color: var(--olive); box-shadow: none; }
-.start.done .ico { stroke: var(--ok); }
+/* Mesaideyken: beyaz zemin, kapalı halka; dokunulunca çıkış */
+.start.done { background: var(--paper); color: var(--olive); box-shadow: 0 10px 28px -18px rgba(52,67,42,.55); }
+.start.done .ico { stroke: var(--olive); }
+.start.done .sub { color: var(--ok); font-weight: 500; }
+.start.done.confirm { background: var(--olive); color: #fff; }
+.start.done.confirm .lbl { font-size: 17px; }
+.start.done.confirm .ico { stroke: var(--khaki-2); }
 
 /* Başarı: halka kapanır, tik çizilir, küçük konfeti */
 .success { position: relative; width: 176px; height: 176px; display: grid; place-items: center; }

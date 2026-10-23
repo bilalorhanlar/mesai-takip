@@ -19,7 +19,8 @@ Dockerfile, Caddyfile  Canlı yayın: Next.js derlenir, Caddy sunar ve /api'yi P
 
 ## Sayfalar
 - `/` — Personel ekranı. İlk açılışta 4 haneli kod girilir, telefon kişiyi hatırlar.
-  Sonra tek bir **Mesaiye Başla** butonu var; işyerine 50 m'den uzaksa giriş yapılamaz.
+  Sonra tek bir buton var: **Mesaiye başla**, mesaideyken **Mesaiyi bitir** (ikinci dokunuşla onay).
+  Giriş de çıkış da sadece işyerinde (50 m içinde) yapılabilir.
   Gizlilik: personel ekranında (ve herkese açık API'de) sadece ilk ad ve "mesaide mi" bilgisi vardır;
   vardiya, saat, geç kalma, ücret gibi her şey yalnızca admin oturumuyla okunabilir.
 - `/admin` — Yönetim paneli.
