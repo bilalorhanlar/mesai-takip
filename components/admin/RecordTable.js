@@ -17,7 +17,10 @@ export default function RecordTable({ records, empty }) {
           <tr key={r.id}>
             <td>{dFmt(r.checkIn)}</td>
             <td><b>{r.staffName}</b></td>
-            <td>{r.shiftName ? <>{r.shiftName} <span className="dim">{r.shiftStart}–{r.shiftEnd}</span></> : '—'}</td>
+            <td>
+              {r.shiftName ? <>{r.shiftName} <span className="dim">{r.partTime ? 'saat serbest' : `${r.shiftStart}–${r.shiftEnd}`}</span></> : '—'}
+              {r.shiftAuto && <span className="dim block">en yakın vardiya</span>}
+            </td>
             <td>{tFmt(r.checkIn)}</td>
             <td>{r.checkOut ? tFmt(r.checkOut) : <span className="pill on">Mesaide</span>}</td>
             <td>{durFmt(r.minutes)}</td>

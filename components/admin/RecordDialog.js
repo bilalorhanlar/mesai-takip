@@ -18,7 +18,8 @@ export default function RecordDialog({ rec, preset = {}, onClose }) {
     }
     const staffId = preset.staffId || state.staff[0]?.id || '';
     const day = preset.day || todayStr();
-    const sh = preset.shift || state.shifts.find((x) => x.id === state.staff.find((s) => s.id === Number(staffId))?.shiftId);
+    let sh = preset.shift || state.shifts.find((x) => x.id === state.staff.find((s) => s.id === Number(staffId))?.shiftId);
+    if (sh?.partTime) sh = null; // part time: saat yok, varsayılan 09:00-18:00 önerilir
     return {
       staff: staffId,
       in: `${day}T${sh?.start || '09:00'}`,
@@ -68,7 +69,7 @@ export default function RecordDialog({ rec, preset = {}, onClose }) {
           <label>Çıkış<input type="datetime-local" value={form.out} onChange={set('out')} /><small>Boş: hâlâ mesaide</small></label>
           <label>Vardiya
             <select value={form.shift} onChange={set('shift')}>
-              <option value="">{rec?.shiftName ? `Aynı kalsın (${rec.shiftName})` : 'O günün vardiyası'}</option>
+              <option value="">{rec?.shiftName && !rec.shiftAuto ? `Aynı kalsın (${rec.shiftName})` : 'Otomatik (plana ya da en yakın saate göre)'}</option>
               {state.shifts.map((x) => <option key={x.id} value={x.id}>{shiftLabel(x)}</option>)}
             </select>
           </label>

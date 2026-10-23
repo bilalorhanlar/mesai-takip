@@ -113,7 +113,7 @@ function SuccessView({ data, name }) {
       <p className="ok-title">İyi çalışmalar, {firstName(name)}</p>
       <p className="ok-time">{tFmt(data.checkIn)}</p>
       <p className={data.late > 0 ? 'ok-sub msg late' : 'ok-sub'}>
-        {data.late > 0 ? `${data.late} dk geç giriş kaydedildi` : 'Girişiniz kaydedildi'}
+        {data.partTime ? 'Part time girişiniz kaydedildi' : data.late > 0 ? `${data.late} dk geç giriş kaydedildi` : 'Girişiniz kaydedildi'}
       </p>
     </section>
   );
@@ -127,8 +127,9 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
   const on = !!info.onShift;
 
   const times = `${info.shiftStart} – ${info.shiftEnd}`;
+  // Part time: saat yok, sadece çalışılan süre tutulur
   // Vardiya adı zaten saatlerden oluşuyorsa tekrar etme
-  const shiftText = !info.shiftStart ? '' : !info.shiftName || info.shiftName.includes(info.shiftStart) ? `Vardiya ${times}` : `${info.shiftName} vardiyası, ${times}`;
+  const shiftText = info.partTime ? 'Part time, çalıştığınız süre kaydedilir' : !info.shiftStart ? '' : !info.shiftName || info.shiftName.includes(info.shiftStart) ? `Vardiya ${times}` : `${info.shiftName} vardiyası, ${times}`;
   const note = msg || (info.onLeave && !on ? { text: 'Bugün izin gününüz 🌿' } : null);
 
   const start = async () => {

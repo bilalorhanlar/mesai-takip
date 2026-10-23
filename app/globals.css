@@ -389,3 +389,38 @@ button.c:hover { box-shadow: 0 0 0 2px var(--olive); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* ---- Part time ve çoklu vardiya ---- */
+.c.part { background: #eef0e6; color: var(--olive); font-size: 10.5px; letter-spacing: -.02em; }
+.c.free { box-shadow: inset 0 0 0 1.5px var(--fog-2); }
+.legend .c.part { width: auto; padding: 0 5px; }
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-2); white-space: nowrap; cursor: pointer; }
+.check input { width: 16px; height: 16px; margin: 0; accent-color: var(--olive); }
+.row-form .inline-check { flex: 0 0 auto; flex-direction: row; align-self: center; padding-bottom: 10px; }
+.list-gap { margin-top: 28px; }
+.cal-head > .btn { margin-bottom: 4px; }
+.strong { font-weight: 500; }
+.code-text { font-variant-numeric: tabular-nums; font-weight: 600; letter-spacing: .3em; color: var(--olive); margin-right: 2px; }
+.tbl td.wrap { white-space: normal; max-width: 280px; }
+.tbl td.wrap .pill { margin: 2px 4px 2px 0; }
+
+.dlg-block { margin-top: 20px; }
+.dlg-label { display: block; font-size: 13.5px; font-weight: 500; color: var(--ink-2); margin-bottom: 8px; }
+.dlg-help { display: block; margin: -4px 0 10px; font-size: 12.5px; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { cursor: pointer; }
+.chip input { position: absolute; opacity: 0; pointer-events: none; }
+.chip span { display: inline-flex; align-items: baseline; gap: 6px; padding: 7px 13px; border-radius: 999px; border: 1px solid var(--rule); font-size: 14px; transition: background .12s, border-color .12s, color .12s; }
+.chip span small { font-size: 12px; color: var(--muted); }
+.chip:hover span { border-color: var(--khaki); }
+.chip input:checked + span { background: var(--olive); border-color: var(--olive); color: #fff; }
+.chip input:checked + span small { color: var(--khaki-2); }
+.chip input:focus-visible + span { outline: 2px solid var(--olive); outline-offset: 2px; }
+.week { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 18px; }
+.dlg .week-day { display: grid; grid-template-columns: 92px 1fr; align-items: center; gap: 10px; font-size: 14px; color: var(--ink-2); }
+.week-day select { padding: 7px 10px; font-size: 14px; }
+.week-day.off select { background: var(--fog); color: var(--muted); }
+@media (max-width: 720px) {
+  .week { grid-template-columns: 1fr; }
+}
+.tbl td .check input { min-width: 0; width: 16px; padding: 0; }

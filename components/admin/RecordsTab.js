@@ -25,7 +25,7 @@ export default function RecordsTab({ active }) {
     const list = await load();
     const full = (iso) => (iso ? new Date(iso).toLocaleString('tr-TR', { timeZone: TZ }) : '');
     const rows = [['Personel', 'Giriş', 'Çıkış', 'Süre (dk)', 'Vardiya', 'Geç (dk)', 'Saatlik ücret', 'Hakediş', 'Manuel', 'Düzenlendi']];
-    for (const r of list) rows.push([r.staffName, full(r.checkIn), full(r.checkOut), r.minutes, r.shiftName ? `${r.shiftName} ${r.shiftStart}-${r.shiftEnd}` : '', r.late, num(r.hourlyRate), num(r.earning), r.manual ? 'Evet' : '', r.edited ? 'Evet' : '']);
+    for (const r of list) rows.push([r.staffName, full(r.checkIn), full(r.checkOut), r.minutes, r.shiftName ? (r.partTime ? `${r.shiftName} (part time)` : `${r.shiftName} ${r.shiftStart}-${r.shiftEnd}`) : '', r.late, num(r.hourlyRate), num(r.earning), r.manual ? 'Evet' : '', r.edited ? 'Evet' : '']);
     downloadCsv(`mesai-${filter.from}-${filter.to}.csv`, rows);
   };
 

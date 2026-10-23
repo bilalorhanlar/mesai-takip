@@ -9,15 +9,19 @@ import Stats from './Stats';
 const STATUS_TXT = {
   ok: 'Zamanında geldi', late: 'Geç geldi', absent: 'Gelmedi', leave: 'İzinli', off: 'Haftalık izin günü',
   open: 'Şu an mesaide', pending: 'Henüz gelmedi', future: 'İleri tarih', before: 'İşe başlamadan önce',
+  part: 'Part time çalıştı', free: 'Part time, gelmedi (eksik sayılmaz)',
 };
-const cellText = (d) => (d.status === 'ok' ? '✓' : d.status === 'late' ? d.late : d.status === 'absent' ? '✕' : d.status === 'leave' ? 'İ' : '');
+// Part time günlerde saat yazılır (ör. 4,5)
+const cellText = (d) => (d.status === 'part' ? hrsFmt(d.minutes || 0) : d.status === 'ok' ? '✓' : d.status === 'late' ? d.late
+  : d.status === 'absent' ? '✕' : d.status === 'leave' ? 'İ' : '');
 
 function DayDialog({ staff, day, today, onClose, onChanged }) {
   const { api, state, toast, openRecord } = useAdmin();
   const d = day;
   const rows = [
     ['Durum', <><span className={`c ${d.status} inline`} /> {STATUS_TXT[d.status]}{d.status === 'late' && <>, <b>{d.late} dk</b></>}</>],
-    ['Vardiya', <>{d.shift ? shiftLabel(d.shift) : '—'}{d.shiftOverride && !d.checkIn && <> <span className="pill">Değiştirildi</span></>}</>],
+    ['Vardiya', <>{d.shift ? shiftLabel(d.shift) : '—'}{d.shiftOverride && !d.checkIn && <> <span className="pill">Bu güne özel</span></>}
+      {!d.checkIn && !d.planned && (staff.shiftIds?.length || 0) > 1 && <span className="dim block">Planlanmadı: girişte en yakın vardiya seçilir</span>}</>],
   ];
   if (d.checkIn) {
     rows.push(
@@ -30,7 +34,7 @@ function DayDialog({ staff, day, today, onClose, onChanged }) {
   }
 
   const setShift = async (e) => {
-    try { await api('admin_set_day_shift', { p_staff: staff.id, p_day: d.day, p_shift: Number(e.target.value) }); toast('Vardiya değiştirildi'); onChanged(); }
+    try { await api('admin_set_day_shift', { p_staff: staff.id, p_day: d.day, p_shift: e.target.value ? Number(e.target.value) : null }); toast('Vardiya değiştirildi'); onChanged(); }
     catch (err) { toast(err.message, false); }
   };
   const toggleLeave = async () => {
@@ -59,7 +63,8 @@ function DayDialog({ staff, day, today, onClose, onChanged }) {
       </div>
       {!d.checkIn && (
         <label className="day-shift">Bu günün vardiyası
-          <select value={d.shift?.id ?? ''} onChange={setShift}>
+          <select value={d.shiftOverride ? d.shift?.id ?? '' : ''} onChange={setShift}>
+            <option value="">Haftalık plana göre</option>
             {state.shifts.map((x) => <option key={x.id} value={x.id}>{shiftLabel(x)}</option>)}
           </select>
         </label>
@@ -101,7 +106,7 @@ export default function CalendarTab({ active }) {
     const mins = s.days.reduce((a, d) => a + (d.minutes || 0), 0);
     const earn = s.days.reduce((a, d) => a + Number(d.earning || 0), 0);
     tLate += late.length; tLateMin += lateMin; tAbsent += absent; tEarn += earn;
-    return { s, lateMin, absent, mins, earn, def: state.shifts.find((x) => x.id === s.shiftId) };
+    return { s, lateMin, absent, mins, earn, names: (s.shiftIds || []).map((id) => state.shifts.find((x) => x.id === id)?.name).filter(Boolean).join(', ') };
   });
 
   return (
@@ -124,6 +129,7 @@ export default function CalendarTab({ active }) {
         <span><i className="c leave">İ</i>İzinli</span>
         <span><i className="c off" />Haftalık izin</span>
         <span><i className="c open" />Mesaide</span>
+        <span><i className="c part">4,5</i>Part time (saat)</span>
         <span><i className="c future swap" />Vardiya değişikliği</span>
       </div>
       <Stats items={[
@@ -147,11 +153,11 @@ export default function CalendarTab({ active }) {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ s, lateMin, absent, mins, earn, def }, si) => (
+                {rows.map(({ s, lateMin, absent, mins, earn, names }, si) => (
                   <tr key={s.id}>
                     <td className="who">
                       <div className="person"><span className="avatar">{initials(s.name)}</span>
-                        <div><b>{s.name}</b><span className="dim">{def ? def.name : 'Vardiya yok'}</span></div>
+                        <div><b>{s.name}</b><span className="dim">{names || 'Vardiya yok'}</span></div>
                       </div>
                     </td>
                     {s.days.map((d, di) => (

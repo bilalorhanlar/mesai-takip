@@ -1,6 +1,6 @@
 'use client';
 
-import { durFmt, initials, minsBetween, money, tFmt, TZ } from '@/lib/format';
+import { durFmt, initials, minsBetween, money, shiftTimes, tFmt, TZ } from '@/lib/format';
 import { useAdmin } from './context';
 import RecordTable from './RecordTable';
 import Stats from './Stats';
@@ -37,7 +37,10 @@ export default function NowTab() {
                 {state.staff.map((s) => (
                   <tr key={s.id}>
                     <td><div className="person"><span className={`avatar${s.onShift ? ' on' : ''}`}>{initials(s.name)}</span><b>{s.name}</b></div></td>
-                    <td>{s.todayShift ? <>{s.todayShift.name} <span className="dim">{s.todayShift.start}–{s.todayShift.end}</span></> : '—'}</td>
+                    <td>
+                      {s.todayShift ? <>{s.todayShift.name} <span className="dim">{shiftTimes(s.todayShift)}</span></> : '—'}
+                      {!s.onShift && !s.todayPlanned && <span className="dim block">Girişe göre otomatik</span>}
+                    </td>
                     <td>
                       {s.onShift
                         ? <><span className="pill on">Mesaide</span>{s.late > 0 && <> <span className="pill late">{s.late} dk geç</span></>}</>
