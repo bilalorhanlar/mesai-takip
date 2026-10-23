@@ -96,7 +96,6 @@ export default function CalendarTab({ active }) {
     setMonth(new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10));
   };
   const [y, m] = month.split('-').map(Number);
-  const days = cal?.staff[0]?.days.map((d) => d.day) || [];
 
   let tLate = 0, tLateMin = 0, tAbsent = 0, tEarn = 0;
   const rows = (cal?.staff || []).map((s) => {
@@ -139,46 +138,38 @@ export default function CalendarTab({ active }) {
         { label: 'Gelinmeyen gün', value: tAbsent },
         { label: 'Aylık hakediş (maaşlar dahil)', value: money(tEarn), money: true, accent: true },
       ]} />
-      <div className="table-wrap cal-wrap">
-        <table className="cal">
-          {rows.length ? (
-            <>
-              <thead>
-                <tr>
-                  <th className="who">Personel</th>
-                  {days.map((d) => {
-                    const dt = new Date(d + 'T12:00:00Z'), dow = (dt.getUTCDay() + 6) % 7;
-                    return <th key={d} className={`${d === cal.today ? 'today' : ''} ${dow >= 5 ? 'we' : ''}`}><small>{DAY_SHORT[dow]}</small>{dt.getUTCDate()}</th>;
-                  })}
-                  <th className="sum">Geç dk</th><th className="sum">Gelmedi</th><th className="sum">Saat</th><th className="sum">Hakediş</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ s, lateMin, absent, mins, earn, names }, si) => (
-                  <tr key={s.id}>
-                    <td className="who">
-                      <div className="person"><span className="avatar">{initials(s.name)}</span>
-                        <div><b>{s.name}</b><span className="dim">{names || 'Vardiya yok'}</span></div>
-                      </div>
-                    </td>
-                    {s.days.map((d, di) => (
-                      <td key={d.day} className={d.day === cal.today ? 'today' : ''}>
-                        <button className={`c ${d.status}${d.shiftOverride ? ' swap' : ''}`} onClick={() => setSel([si, di])}
-                          title={`${STATUS_TXT[d.status]}${d.shift ? ', ' + shiftLabel(d.shift) : ''}`}>{cellText(d)}</button>
-                      </td>
-                    ))}
-                    <td className={`sum${lateMin ? ' warn' : ''}`}>{lateMin || '–'}</td>
-                    <td className={`sum${absent ? ' bad' : ''}`}>{absent || '–'}</td>
-                    <td className={`sum${s.monthlyHours != null && mins < s.monthlyHours * 60 && cal.to <= cal.today ? ' warn' : ''}`}>
-                      {mins ? hrsFmt(mins) : '–'}{s.monthlyHours != null && <span className="dim"> / {s.monthlyHours}</span>}
-                    </td>
-                    <td className="sum money">{earn ? money(earn) : s.payType === 'salary' ? <span className="dim">Maaşlı</span> : '–'}</td>
-                  </tr>
+      {/* Her personel için 7 sütunlu ay ızgarası: hiçbir genişlikte yatay kaydırma gerekmez */}
+      <div className="cal-list">
+        {rows.length ? rows.map(({ s, lateMin, absent, mins, earn, names }, si) => {
+          const lead = s.days.length ? (new Date(s.days[0].day + 'T12:00:00Z').getUTCDay() + 6) % 7 : 0;
+          const short = s.monthlyHours != null && mins < s.monthlyHours * 60 && cal.to <= cal.today;
+          return (
+            <article key={s.id} className="cal-person">
+              <header className="cal-person-head">
+                <div className="person"><span className="avatar">{initials(s.name)}</span>
+                  <div><b className="strong">{s.name}</b><span className="dim block">{names || 'Vardiya yok'}</span></div>
+                </div>
+                <dl className="cal-sums">
+                  <div><dt>Geç</dt><dd className={lateMin ? 'warn' : ''}>{lateMin ? `${lateMin} dk` : '–'}</dd></div>
+                  <div><dt>Gelmedi</dt><dd className={absent ? 'bad' : ''}>{absent || '–'}</dd></div>
+                  <div><dt>Saat</dt><dd className={short ? 'warn' : ''}>{mins ? hrsFmt(mins) : '–'}{s.monthlyHours != null && <span className="dim"> / {s.monthlyHours}</span>}</dd></div>
+                  <div><dt>Hakediş</dt><dd className="money">{earn ? money(earn) : s.payType === 'salary' ? <span className="dim">Maaşlı</span> : '–'}</dd></div>
+                </dl>
+              </header>
+              <div className="month">
+                {DAY_SHORT.map((d, i) => <span key={d} className={`month-dow${i >= 5 ? ' we' : ''}`}>{d}</span>)}
+                {Array.from({ length: lead }, (_, i) => <span key={`b${i}`} />)}
+                {s.days.map((d, di) => (
+                  <button key={d.day} className={`month-cell${d.day === cal.today ? ' today' : ''}`} onClick={() => setSel([si, di])}
+                    title={`${dayFmt(d.day)}: ${STATUS_TXT[d.status]}${d.shift ? ', ' + shiftLabel(d.shift) : ''}`}>
+                    <span className="month-num">{Number(d.day.slice(8))}</span>
+                    <span className={`c ${d.status}${d.shiftOverride ? ' swap' : ''}`}>{cellText(d)}</span>
+                  </button>
                 ))}
-              </tbody>
-            </>
-          ) : <tbody><tr><td className="empty">{cal ? 'Henüz personel yok.' : 'Yükleniyor…'}</td></tr></tbody>}
-        </table>
+              </div>
+            </article>
+          );
+        }) : <p className="empty-note">{cal ? 'Henüz personel yok.' : 'Yükleniyor…'}</p>}
       </div>
       {sel && cal && (
         <DayDialog staff={cal.staff[sel[0]]} day={cal.staff[sel[0]].days[sel[1]]} today={cal.today}

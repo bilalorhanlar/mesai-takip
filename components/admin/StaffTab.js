@@ -44,26 +44,26 @@ export default function StaffTab() {
       </div>
 
       <div className="table-wrap list-gap">
-        <table className="tbl">
+        <table className="tbl stack lg">
           {state.staff.length ? (
             <>
               <thead><tr><th>Ad soyad</th><th>Giriş kodu</th><th>Vardiyalar</th><th>Haftalık plan</th><th>Ücret</th><th>Aylık hedef</th><th /></tr></thead>
               <tbody>
                 {state.staff.map((s) => (
                   <tr key={s.id}>
-                    <td><b className="strong">{s.name}</b></td>
-                    <td>
+                    <td className="main"><b className="strong">{s.name}</b></td>
+                    <td data-label="Giriş kodu">
                       <span className="code-text">{s.code}</span>
                       <button className="btn ghost sm" title="Rastgele kod" onClick={() => randomCode(s)}>↻</button>
                     </td>
-                    <td className="wrap">
+                    <td className="wrap" data-label="Vardiyalar">
                       {(s.shiftIds || []).map((id) => state.shifts.find((x) => x.id === id)).filter(Boolean).map((x) => (
                         <span key={x.id} className={`pill${x.partTime ? ' leave' : ''}`}>{x.name}</span>
                       ))}
                     </td>
-                    <td className="wrap dim">{planSummary(s, state.shifts)}</td>
-                    <td>{payText(s)}</td>
-                    <td>{s.monthlyHours != null ? `${s.monthlyHours} sa` : <span className="dim">—</span>}</td>
+                    <td className="wrap dim" data-label="Haftalık plan">{planSummary(s, state.shifts)}</td>
+                    <td data-label="Ücret">{payText(s)}</td>
+                    <td data-label="Aylık hedef">{s.monthlyHours != null ? `${s.monthlyHours} sa` : <span className="dim">—</span>}</td>
                     <td className="act">
                       <button className="btn sm" onClick={() => setDlg({ staff: s })}>Düzenle</button>
                       <button className="btn ghost sm danger" onClick={() => remove(s)}>Sil</button>

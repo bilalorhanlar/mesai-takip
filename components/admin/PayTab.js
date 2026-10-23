@@ -101,20 +101,20 @@ export default function PayTab({ active }) {
         { label: 'Toplam hakediş', value: money(data.reduce((a, p) => a + p.total, 0)), money: true, accent: true },
       ]} />
       <div className="table-wrap">
-        <table className="tbl pay">
+        <table className="tbl pay stack lg">
           {data.length ? (
             <>
               <thead><tr><th>Personel</th><th>Ücret</th><th>Gün</th><th>Saat / hedef</th><th>Eksik</th><th>Gecikme</th><th className="r">Hakediş</th><th /></tr></thead>
               {data.map((p) => (
                 <tbody key={p.id} className="pay-group" data-open={open.has(p.id) ? '1' : '0'}>
                   <tr className="pay-row" onClick={() => p.days.length && toggle(p.id)}>
-                    <td><div className="person"><span className="avatar">{initials(p.name)}</span><b>{p.name}</b></div></td>
-                    <td>{p.staff ? payText(p.staff) : '—'}</td>
-                    <td>{p.days.length}</td>
-                    <td><Progress minutes={p.minutes} target={p.target} /></td>
-                    <td>{p.missing ? <span className="pill late">{hrsFmt(p.missing)} sa</span> : p.target != null ? <span className="pill on-soft">Tamam</span> : '—'}</td>
-                    <td>{p.late ? <span className="pill late">{p.late} dk</span> : '—'}</td>
-                    <td className="r">
+                    <td className="main"><div className="person"><span className="avatar">{initials(p.name)}</span><b>{p.name}</b></div></td>
+                    <td data-label="Ücret">{p.staff ? payText(p.staff) : '—'}</td>
+                    <td data-label="Gün">{p.days.length}</td>
+                    <td data-label="Saat / hedef"><Progress minutes={p.minutes} target={p.target} /></td>
+                    <td data-label="Eksik">{p.missing ? <span className="pill late">{hrsFmt(p.missing)} sa</span> : p.target != null ? <span className="pill on-soft">Tamam</span> : '—'}</td>
+                    <td data-label="Gecikme">{p.late ? <span className="pill late">{p.late} dk</span> : '—'}</td>
+                    <td className="r" data-label="Hakediş">
                       {p.staff?.payType === 'salary' && p.staff.monthlySalary == null && !p.earning
                         ? <span className="dim">Maaş girilmedi</span>
                         : <b className="money big">{money(p.total)}</b>}
@@ -123,14 +123,14 @@ export default function PayTab({ active }) {
                   </tr>
                   {p.days.map((d) => (
                     <tr key={d.day} className="pay-day">
-                      <td>{dayFmt(d.day)}</td>
-                      <td colSpan={3}>
+                      <td className="main">{dayFmt(d.day)}</td>
+                      <td colSpan={3} data-label="Saatler">
                         {d.records.map((r) => `${tFmt(r.checkIn)}–${r.checkOut ? tFmt(r.checkOut) : '…'}`).join(', ')}
                         <span className="dim">, toplam {durFmt(d.minutes)}</span>
                       </td>
-                      <td />
-                      <td>{d.late > 0 && <span className="pill late">{d.late} dk</span>}</td>
-                      <td className="r">{d.earning ? <b>{money(d.earning)}</b> : <span className="dim">—</span>}</td>
+                      <td className="pay-gap" />
+                      <td data-label="Gecikme">{d.late > 0 && <span className="pill late">{d.late} dk</span>}</td>
+                      <td className="r" data-label="Hakediş">{d.earning ? <b>{money(d.earning)}</b> : <span className="dim">—</span>}</td>
                       <td className="act">
                         {d.records.map((r) => <button key={r.id} className="btn ghost sm" onClick={() => openRecord(r)}>Düzenle</button>)}
                       </td>

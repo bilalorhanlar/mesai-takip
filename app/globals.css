@@ -453,11 +453,71 @@ button.c:hover { box-shadow: 0 0 0 2px var(--olive); }
     display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px;
     padding: 14px 16px; border-bottom: 1px solid var(--rule);
   }
-  .tbl.stack tr:last-child { border-bottom: none; }
-  .tbl.stack td { display: block; padding: 0; border: none; min-width: 0; }
-  .tbl.stack td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; font-size: 12.5px; color: var(--muted); }
-  .tbl.stack td.main, .tbl.stack td.empty { grid-column: 1 / -1; }
-  .tbl.stack td.act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; text-align: left; }
-  .tbl.stack td.act:empty { display: none; }
+  .tbl.stack tbody:last-child tr:last-child { border-bottom: none; }
+  .tbl.stack td { display: block; padding: 0; border: none; min-width: 0; max-width: none; text-align: left !important; }
+  .tbl.stack td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 12.5px; color: var(--muted); }
+  .tbl.stack td.main, .tbl.stack td.empty, .tbl.stack td.wrap, .tbl.stack td[colspan] { grid-column: 1 / -1; }
+  .tbl.stack td.act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tbl.stack td.act:empty, .tbl.stack td.pay-gap { display: none; }
   .tbl.stack td.act .btn { margin-left: 0; }
+  .tbl.stack td input, .tbl.stack td select { width: 100%; min-width: 0; }
 }
+@media (max-width: 1100px) {
+  .tbl.stack.lg thead { display: none; }
+  .tbl.stack.lg, .tbl.stack.lg tbody { display: block; }
+  .tbl.stack.lg tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px;
+    padding: 14px 16px; border-bottom: 1px solid var(--rule);
+  }
+  .tbl.stack.lg tbody:last-child tr:last-child { border-bottom: none; }
+  .tbl.stack.lg td { display: block; padding: 0; border: none; min-width: 0; max-width: none; text-align: left !important; }
+  .tbl.stack.lg td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 3px; font-size: 12.5px; color: var(--muted); }
+  .tbl.stack.lg td.main, .tbl.stack.lg td.empty, .tbl.stack.lg td.wrap, .tbl.stack.lg td[colspan] { grid-column: 1 / -1; }
+  .tbl.stack.lg td.act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+  .tbl.stack.lg td.act:empty, .tbl.stack.lg td.pay-gap { display: none; }
+  .tbl.stack.lg td.act .btn { margin-left: 0; }
+  .tbl.stack.lg td input, .tbl.stack.lg td select { width: 100%; min-width: 0; }
+}
+/* Hakediş: açılan günlük döküm kart düzeninde de görünür */
+@media (max-width: 1100px) {
+  .tbl.pay.stack .pay-group[data-open="1"] .pay-day { display: grid; }
+  .tbl.pay.stack .pay-day { background: #fbfbf8; padding-left: 28px; }
+  .tbl.pay.stack .pay-day td { background: none; padding: 0 !important; }
+  .tbl.pay.stack .pay-row td.act { grid-column: 1 / -1; justify-content: flex-start; color: var(--olive); font-size: 14px; font-weight: 500; }
+  .tbl.pay.stack .pay-row td.act .chev { font-size: 18px; }
+  .tbl.pay.stack .pay-row td.act:not(:empty)::before { content: "Günlük döküm"; }
+  .tbl.pay.stack .pay-group[data-open="1"] .pay-row td.act:not(:empty)::before { content: "Dökümü gizle"; }
+}
+
+/* ---- Takvim: personel başına ay ızgarası ---- */
+.cal-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 16px; margin-top: 24px; }
+.cal-person { border: 1px solid var(--rule); border-radius: 14px; padding: 16px; min-width: 0; }
+.cal-person-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; margin-bottom: 14px; }
+.cal-sums { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; }
+.cal-sums div { min-width: 0; }
+.cal-sums dt { font-size: 12px; color: var(--muted); }
+.cal-sums dd { margin: 0; font-size: 14.5px; font-weight: 500; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cal-sums dd.warn { color: var(--late); }
+.cal-sums dd.bad { color: var(--err); }
+.month { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.month-dow { text-align: center; font-size: 12px; color: var(--muted); padding-bottom: 2px; }
+.month-dow.we { color: var(--khaki); }
+.month-cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0;
+  padding: 4px 0 6px; border: none; border-radius: 10px; background: none; transition: background .12s;
+}
+.month-cell:hover { background: var(--fog); }
+.month-cell.today { background: var(--fog); box-shadow: inset 0 0 0 1.5px var(--olive); }
+.month-num { font-size: 11.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.month-cell .c { width: min(100%, 30px); height: 26px; }
+.empty-note { color: var(--muted); padding: 24px 0; }
+
+/* ---- Telefonda sekmeler kaymadan alt satıra geçer ---- */
+@media (max-width: 720px) {
+  .tabs { flex-wrap: wrap; height: auto; overflow: visible; padding: 4px 6px 6px; gap: 0; }
+  .tabs button { padding: 8px 10px; font-size: 14px; }
+  .tabs button.active::after { left: 8px; right: 8px; bottom: 2px; height: 4px; }
+  .cal-person { padding: 12px; }
+}
+@media (max-width: 1100px) { .tbl.stack.lg td[data-label]:empty { display: none; } }
+@media (max-width: 860px) { .tbl.stack td[data-label]:empty { display: none; } }

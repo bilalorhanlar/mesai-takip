@@ -28,15 +28,15 @@ function ShiftRow({ x }) {
 
   return (
     <tr>
-      <td><input value={f.name} onChange={set('name')} /></td>
-      <td><label className="check"><input type="checkbox" checked={f.partTime} onChange={set('partTime')} /> Part time</label></td>
-      <td>{f.partTime ? <span className="dim">—</span> : <input type="time" value={f.start} onChange={set('start')} />}</td>
-      <td>{f.partTime ? <span className="dim">—</span> : <input type="time" value={f.end} onChange={set('end')} />}</td>
-      <td>
+      <td className="main"><input value={f.name} onChange={set('name')} aria-label="Vardiya adı" /></td>
+      <td data-label="Tür"><label className="check"><input type="checkbox" checked={f.partTime} onChange={set('partTime')} /> Part time</label></td>
+      <td data-label="Başlangıç">{f.partTime ? <span className="dim">—</span> : <input type="time" value={f.start} onChange={set('start')} />}</td>
+      <td data-label="Bitiş">{f.partTime ? <span className="dim">—</span> : <input type="time" value={f.end} onChange={set('end')} />}</td>
+      <td data-label="Süre">
         {f.partTime ? <span className="dim">Çalıştığı kadar</span>
           : <>{durFmt(m)}{f.end <= f.start && <> <span className="pill">Ertesi gün biter</span></>}</>}
       </td>
-      <td>{x.staffCount ? <span className="pill on-soft">{x.staffCount} kişi</span> : <span className="dim">—</span>}</td>
+      <td data-label="Personel">{x.staffCount ? <span className="pill on-soft">{x.staffCount} kişi</span> : <span className="dim">—</span>}</td>
       <td className="act">
         <button className="btn primary sm" onClick={save}>Kaydet</button>
         <button className="btn ghost sm danger" onClick={remove}>Sil</button>
@@ -75,7 +75,7 @@ export default function ShiftsTab() {
       </form>
       <h2>Tanımlı vardiyalar</h2>
       <div className="table-wrap">
-        <table className="tbl">
+        <table className="tbl stack lg">
           {state.shifts.length ? (
             <>
               <thead><tr><th>Vardiya adı</th><th>Tür</th><th>Başlangıç</th><th>Bitiş</th><th>Süre</th><th>Personel</th><th /></tr></thead>
