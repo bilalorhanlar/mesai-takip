@@ -439,3 +439,25 @@ button.c:hover { box-shadow: 0 0 0 2px var(--olive); }
 .progress-bar i { display: block; height: 100%; border-radius: 5px; background: var(--khaki); }
 .progress-bar i.full { background: var(--olive); }
 .row-form label.wide-narrow { flex: 0 1 190px; }
+
+/* ---- Yığılan tablo (.stack): yatay kaydırma yok ---- */
+.tbl.stack td { white-space: normal; }
+.tbl.stack td.act { white-space: nowrap; }
+.tbl.stack .notes { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tbl.stack .notes:empty { display: none; }
+.table-wrap:has(> .tbl.stack) { overflow-x: visible; }
+@media (max-width: 860px) {
+  .tbl.stack thead { display: none; }
+  .tbl.stack, .tbl.stack tbody { display: block; }
+  .tbl.stack tr {
+    display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px;
+    padding: 14px 16px; border-bottom: 1px solid var(--rule);
+  }
+  .tbl.stack tr:last-child { border-bottom: none; }
+  .tbl.stack td { display: block; padding: 0; border: none; min-width: 0; }
+  .tbl.stack td[data-label]::before { content: attr(data-label); display: block; margin-bottom: 2px; font-size: 12.5px; color: var(--muted); }
+  .tbl.stack td.main, .tbl.stack td.empty { grid-column: 1 / -1; }
+  .tbl.stack td.act { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; text-align: left; }
+  .tbl.stack td.act:empty { display: none; }
+  .tbl.stack td.act .btn { margin-left: 0; }
+}
