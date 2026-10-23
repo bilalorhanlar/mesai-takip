@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { DAY_SHORT, money } from '@/lib/format';
+import { DAY_SHORT, payText } from '@/lib/format';
 import { useAdmin } from './context';
 import StaffDialog from './StaffDialog';
 
@@ -47,7 +47,7 @@ export default function StaffTab() {
         <table className="tbl">
           {state.staff.length ? (
             <>
-              <thead><tr><th>Ad soyad</th><th>Giriş kodu</th><th>Vardiyalar</th><th>Haftalık plan</th><th>Ücret</th><th /></tr></thead>
+              <thead><tr><th>Ad soyad</th><th>Giriş kodu</th><th>Vardiyalar</th><th>Haftalık plan</th><th>Ücret</th><th>Aylık hedef</th><th /></tr></thead>
               <tbody>
                 {state.staff.map((s) => (
                   <tr key={s.id}>
@@ -62,7 +62,8 @@ export default function StaffTab() {
                       ))}
                     </td>
                     <td className="wrap dim">{planSummary(s, state.shifts)}</td>
-                    <td>{money(s.hourlyRate)}/sa</td>
+                    <td>{payText(s)}</td>
+                    <td>{s.monthlyHours != null ? `${s.monthlyHours} sa` : <span className="dim">—</span>}</td>
                     <td className="act">
                       <button className="btn sm" onClick={() => setDlg({ staff: s })}>Düzenle</button>
                       <button className="btn ghost sm danger" onClick={() => remove(s)}>Sil</button>

@@ -31,6 +31,8 @@ export default function RecordDialog({ rec, preset = {}, onClose }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const staff = state.staff.find((s) => s.id === Number(form.staff));
+  const recStaff = rec ? state.staff.find((s) => s.id === rec.staffId) : staff;
+  const salaried = recStaff?.payType === 'salary' && !(rec && Number(rec.hourlyRate));
   const rate = form.rate !== '' ? Number(form.rate) : Number(staff?.hourlyRate || 0);
   const mins = form.in ? minsBetween(fromLocalInput(form.in), form.out ? fromLocalInput(form.out) : null) : null;
 
@@ -40,7 +42,7 @@ export default function RecordDialog({ rec, preset = {}, onClose }) {
       await api('admin_save_record', {
         p_id: rec?.id || null, p_staff: rec ? null : Number(form.staff),
         p_check_in: fromLocalInput(form.in), p_check_out: fromLocalInput(form.out),
-        p_shift: form.shift ? Number(form.shift) : null, p_hourly_rate: form.rate === '' ? null : Number(form.rate),
+        p_shift: form.shift ? Number(form.shift) : null, p_hourly_rate: salaried || form.rate === '' ? null : Number(form.rate),
       });
       toast(rec ? 'Kayıt güncellendi' : 'Kayıt eklendi'); onClose(); afterChange();
     } catch (e2) { setErr(e2.message); }
@@ -73,12 +75,14 @@ export default function RecordDialog({ rec, preset = {}, onClose }) {
               {state.shifts.map((x) => <option key={x.id} value={x.id}>{shiftLabel(x)}</option>)}
             </select>
           </label>
-          <label>Saatlik ücret (₺)
+          {!salaried && <label>Saatlik ücret (₺)
             <input type="number" min="0" step="0.01" placeholder="Personelin ücreti" value={form.rate} onChange={set('rate')} />
-          </label>
+          </label>}
         </div>
         {mins != null && (
-          <div className="preview"><span>{durFmt(mins)} × {money(rate)}/sa</span><b>{money((mins / 60) * rate)}</b></div>
+          <div className="preview">{salaried
+            ? <><span>Çalışılan süre (maaşlı)</span><b>{durFmt(mins)}</b></>
+            : <><span>{durFmt(mins)} × {money(rate)}/sa</span><b>{money((mins / 60) * rate)}</b></>}</div>
         )}
         <p className="msg err">{err}</p>
         <div className="dlg-actions">

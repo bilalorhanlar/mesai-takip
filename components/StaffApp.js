@@ -92,7 +92,9 @@ function CodeView({ onIdentified, initialError }) {
 
 // ---- Başarı animasyonu ----
 const CONFETTI_COLORS = ['#3b4a2c', '#9a9364', '#d8d2ad', '#56663f', '#c9c3a0'];
-function SuccessView({ data, name }) {
+// Gizlilik: geç kalma, vardiya vb. gösterilmez; sadece onay
+function SuccessView({ name }) {
+  const [at] = useState(() => new Date().toISOString());
   const [pieces] = useState(() => Array.from({ length: 26 }, (_, i) => {
     const a = (Math.PI * 2 * i) / 26 + Math.random() * 0.3, dist = 110 + Math.random() * 90;
     return {
@@ -111,10 +113,8 @@ function SuccessView({ data, name }) {
         {pieces.map((style, i) => <span key={i} className="confetti" style={style} />)}
       </div>
       <p className="ok-title">İyi çalışmalar, {firstName(name)}</p>
-      <p className="ok-time">{tFmt(data.checkIn)}</p>
-      <p className={data.late > 0 ? 'ok-sub msg late' : 'ok-sub'}>
-        {data.partTime ? 'Part time girişiniz kaydedildi' : data.late > 0 ? `${data.late} dk geç giriş kaydedildi` : 'Girişiniz kaydedildi'}
-      </p>
+      <p className="ok-time">{tFmt(at)}</p>
+      <p className="ok-sub">Girişiniz kaydedildi</p>
     </section>
   );
 }
@@ -126,11 +126,8 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
   const [msg, setMsg] = useState(null);
   const on = !!info.onShift;
 
-  const times = `${info.shiftStart} – ${info.shiftEnd}`;
-  // Part time: saat yok, sadece çalışılan süre tutulur
-  // Vardiya adı zaten saatlerden oluşuyorsa tekrar etme
-  const shiftText = info.partTime ? 'Part time, çalıştığınız süre kaydedilir' : !info.shiftStart ? '' : !info.shiftName || info.shiftName.includes(info.shiftStart) ? `Vardiya ${times}` : `${info.shiftName} vardiyası, ${times}`;
-  const note = msg || (info.onLeave && !on ? { text: 'Bugün izin gününüz 🌿' } : null);
+  // Gizlilik: personel ekranında vardiya, saat, izin, geç kalma gösterilmez
+  const note = msg;
 
   const start = async () => {
     const me = getMe(); if (!me) return onInvalidCode();
@@ -142,7 +139,7 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
       setBusy(false);
       if (ok) return onCheckedIn(data);
       if (status === 404) return onInvalidCode('Kodunuz geçersiz, tekrar girin.');
-      if (status === 409) return onShiftUpdate({ onShift: true, checkIn: data.checkIn });
+      if (status === 409) return onShiftUpdate({ onShift: true });
       throw new Error(data.error || 'Giriş yapılamadı');
     } catch (e) {
       setBusy(false); setFailed(true);
@@ -154,7 +151,6 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
   return (
     <section className="view">
       <h1 className="hello">{greeting()},<br /><em>{firstName(info.name)}</em></h1>
-      {shiftText && <span className="shift">{shiftText}</span>}
       <div className={`start-zone${on ? ' done' : ''}${busy ? ' busy' : ''}`}>
         <svg className="stroke-ring" viewBox="0 0 240 240" aria-hidden="true">
           <circle className="arc" cx="120" cy="120" r="112" />
@@ -164,7 +160,6 @@ function MainView({ info, onCheckedIn, onInvalidCode, onShiftUpdate }) {
           <span className="lbl">
             {on ? 'Mesaidesiniz' : busy ? <>Konum<br />alınıyor</> : failed ? <>Tekrar<br />dene</> : <>Mesaiye<br />başla</>}
           </span>
-          {on && <span className="sub">{tFmt(info.checkIn)} itibarıyla</span>}
         </button>
       </div>
       <p className={`msg${note?.err ? ' err' : ''}`}>{note?.text}</p>
@@ -216,7 +211,7 @@ export default function StaffApp() {
             <MainView info={info} onCheckedIn={onCheckedIn} onInvalidCode={toCode}
               onShiftUpdate={(u) => setInfo((i) => ({ ...i, ...u }))} />
           )}
-          {view === 'ok' && okData && <SuccessView data={okData} name={okData.name || info?.name || ''} />}
+          {view === 'ok' && okData && <SuccessView name={okData.name || info?.name || ''} />}
         </div>
       </main>
     </div>

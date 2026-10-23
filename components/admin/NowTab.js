@@ -24,7 +24,7 @@ export default function NowTab() {
         { label: 'Şu an mesaide', value: on.length, accent: true },
         { label: 'Bugün giriş', value: state.today.length },
         { label: 'Geç kalan', value: state.today.filter((r) => r.late > 0).length },
-        { label: 'Bugünkü hakediş', value: money(earned), money: true },
+        { label: 'Bugünkü saatlik hakediş', value: money(earned), money: true },
       ]} />
 
       <h2>Personel durumu</h2>

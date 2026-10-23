@@ -57,6 +57,10 @@ alter table staff add column if not exists off_days int[] not null default '{}';
 -- Varsayılan vardiya ve saatlik ücret
 alter table staff add column if not exists shift_id bigint references shifts (id);
 alter table staff add column if not exists hourly_rate numeric(10, 2) not null default 0;
+-- Ücret türü: saatlik (hourly_rate) ya da maaşlı (monthly_salary, boş olabilir). Aylık hedef saat herkes için isteğe bağlı.
+alter table staff add column if not exists pay_type text not null default 'hourly' check (pay_type in ('hourly', 'salary'));
+alter table staff add column if not exists monthly_salary numeric(12, 2);
+alter table staff add column if not exists monthly_hours numeric(6, 1);
 
 -- Part time vardiya: saat yok; geç kalma ve "gelmedi" hesaplanmaz, sadece çalışılan süre tutulur
 alter table shifts add column if not exists part_time boolean not null default false;
@@ -174,6 +178,8 @@ drop function if exists admin_update_staff(text, bigint, text, bigint, numeric, 
 drop function if exists admin_save_shift(text, bigint, text, time, time);
 drop function if exists _shift_for(bigint, date);
 drop function if exists _apply_shift(records, bigint);
+drop function if exists admin_add_staff(text, text, bigint[], numeric, int[], jsonb, text);
+drop function if exists admin_update_staff(text, bigint, text, bigint[], numeric, int[], jsonb);
 
 -- ---------------------------------------------------------------------
 -- Yardımcı (dahili) fonksiyonlar
@@ -327,7 +333,7 @@ language sql stable security definer set search_path = public, extensions as $$
     'distance', r.distance, 'late', r.late, 'manual', r.manual, 'edited', r.edited,
     'shiftId', r.shift_id, 'shiftName', r.shift_name, 'partTime', r.part_time, 'shiftAuto', r.shift_auto,
     'shiftStart', to_char(r.shift_start, 'HH24:MI'), 'shiftEnd', to_char(r.shift_end, 'HH24:MI'),
-    'hourlyRate', r.hourly_rate, 'minutes', _minutes(r),
+    'hourlyRate', r.hourly_rate, 'minutes', _minutes(r), 'payType', s.pay_type,
     'earning', round(_minutes(r) / 60.0 * r.hourly_rate, 2))
   from staff s where s.id = r.staff_id
 $$;
@@ -342,7 +348,8 @@ $$;
 create or replace function _staff_json(s staff) returns json
 language sql stable security definer set search_path = public, extensions as $$
   select json_build_object('id', s.id, 'name', s.name, 'code', s.code, 'offDays', s.off_days,
-    'shiftId', s.shift_id, 'shiftIds', s.shift_ids, 'weekPlan', s.week_plan, 'hourlyRate', s.hourly_rate)
+    'shiftId', s.shift_id, 'shiftIds', s.shift_ids, 'weekPlan', s.week_plan, 'hourlyRate', s.hourly_rate,
+    'payType', s.pay_type, 'monthlySalary', s.monthly_salary, 'monthlyHours', s.monthly_hours)
 $$;
 
 -- Kaydın vardiya bilgisini (anlık görüntü) doldurur ve geç kalmayı hesaplar
@@ -369,7 +376,7 @@ end $$;
 -- ---------------------------------------------------------------------
 create or replace function staff_status(p_code text) returns json
 language plpgsql security definer set search_path = public, extensions as $$
-declare s staff; r records; x shifts; today date := _ist_date(now()); k text := 'staff:' || _client_key();
+declare s staff; k text := 'staff:' || _client_key();
 begin
   if _too_many_fails(k) then return json_build_object('status', 429, 'error', 'Çok fazla hatalı deneme. 15 dakika sonra tekrar deneyin.'); end if;
   select * into s from staff where code = p_code and not deleted;
@@ -377,13 +384,10 @@ begin
     perform _register_fail(k);
     return json_build_object('status', 404, 'error', 'Kod bulunamadı');
   end if;
-  select * into r from records where staff_id = s.id and check_out is null;
-  x := _shift_for(s.id, today, coalesce(r.check_in, now()));
-  if r.id is not null then select * into x from shifts where id = r.shift_id; end if;
-  return json_build_object('status', 200, 'name', s.name, 'partTime', coalesce(x.part_time, false),
-    'shiftName', x.name, 'shiftStart', to_char(x.start_time, 'HH24:MI'), 'shiftEnd', to_char(x.end_time, 'HH24:MI'),
-    'onShift', r.id is not null, 'checkIn', r.check_in,
-    'onLeave', _on_leave(s.id, today));
+  -- Gizlilik: personele (ve kodu bilen herkese) sadece ilk adı ve mesaide olup olmadığı döner.
+  -- Vardiya, saat, geç kalma, izin, ücret gibi bilgiler yalnızca admin fonksiyonlarındadır.
+  return json_build_object('status', 200, 'name', split_part(s.name, ' ', 1),
+    'onShift', exists (select 1 from records where staff_id = s.id and check_out is null));
 end $$;
 
 create or replace function staff_checkin(p_code text, p_lat float8, p_lng float8, p_accuracy float8 default null) returns json
@@ -401,12 +405,11 @@ begin
   select * into st from settings where id = 1;
   dist := _distance_m(p_lat, p_lng, st.lat, st.lng);
   if dist > st.radius then
-    return json_build_object('status', 403, 'distance', round(dist),
-      'error', format('İşyerine uzaksınız (%s m). Giriş için %s m içinde olmalısınız.', round(dist), st.radius));
+    return json_build_object('status', 403, 'error', 'İşyerinde değilsiniz. Giriş sadece işyerinden yapılabilir.');
   end if;
 
   select * into r from records where staff_id = s.id and check_out is null;
-  if found then return json_build_object('status', 409, 'error', 'Zaten mesaidesiniz', 'name', s.name, 'checkIn', r.check_in); end if;
+  if found then return json_build_object('status', 409, 'error', 'Zaten mesaidesiniz'); end if;
 
   r := null;
   r.staff_id := s.id; r.check_in := now();
@@ -414,7 +417,7 @@ begin
   insert into records (staff_id, check_in, lat, lng, accuracy, distance, late, shift_id, shift_name, shift_start, shift_end, part_time, shift_auto, hourly_rate)
   values (s.id, r.check_in, p_lat, p_lng, p_accuracy, round(dist), r.late, r.shift_id, r.shift_name, r.shift_start, r.shift_end, r.part_time, r.shift_auto, s.hourly_rate)
   returning * into r;
-  return json_build_object('status', 200, 'name', s.name, 'checkIn', r.check_in, 'late', r.late, 'partTime', r.part_time);
+  return json_build_object('status', 200, 'name', split_part(s.name, ' ', 1));
 end $$;
 
 -- ---------------------------------------------------------------------
@@ -499,6 +502,9 @@ begin
       select json_agg(json_build_object(
         'id', s.id, 'name', s.name, 'code', s.code, 'offDays', s.off_days, 'onLeave', _on_leave(s.id, today),
         'shiftId', s.shift_id, 'shiftIds', s.shift_ids, 'weekPlan', s.week_plan, 'hourlyRate', s.hourly_rate,
+        'payType', s.pay_type, 'monthlySalary', s.monthly_salary, 'monthlyHours', s.monthly_hours,
+        'monthMinutes', (select coalesce(sum(_minutes(m)), 0) from records m where m.staff_id = s.id
+                          and date_trunc('month', _ist_date(m.check_in)) = date_trunc('month', today)),
         'todayShift', _shift_json(case when r.id is not null then (select x from shifts x where x.id = r.shift_id)
                                        else _shift_for(s.id, today, now()) end),
         'todayPlanned', _planned_shift(s.id, today) is not null or cardinality(s.shift_ids) <= 1,
@@ -600,32 +606,47 @@ begin
   select coalesce(jsonb_object_agg(e.key, e.value), '{}') into week_plan from jsonb_each(week_plan) e where not e.key::int = any (off_days);
 end $$;
 
-create or replace function admin_add_staff(p_token text, p_name text, p_shift_ids bigint[], p_hourly_rate numeric default 0,
+-- Ücret bilgisini doğrular. Maaşlıda saatlik ücret 0 olur (hakediş = maaş); maaş ve hedef saat boş olabilir.
+create or replace function _check_pay(p_pay_type text, p_hourly_rate numeric, p_monthly_salary numeric, p_monthly_hours numeric) returns void
+language plpgsql immutable as $$
+begin
+  if p_pay_type not in ('hourly', 'salary') then raise exception 'Geçersiz ücret türü'; end if;
+  if coalesce(p_hourly_rate, 0) < 0 or coalesce(p_monthly_salary, 0) < 0 then raise exception 'Ücret negatif olamaz'; end if;
+  if p_monthly_hours is not null and p_monthly_hours not between 0 and 744 then raise exception 'Aylık saat 0 ile 744 arasında olmalı'; end if;
+end $$;
+
+create or replace function admin_add_staff(p_token text, p_name text, p_shift_ids bigint[], p_pay_type text default 'hourly',
+  p_hourly_rate numeric default 0, p_monthly_salary numeric default null, p_monthly_hours numeric default null,
   p_off_days int[] default '{}', p_week_plan jsonb default '{}', p_code text default null) returns json
 language plpgsql security definer set search_path = public, extensions as $$
 declare s staff; c record;
 begin
   perform _assert_admin(p_token);
   if coalesce(trim(p_name), '') = '' then raise exception 'İsim gerekli'; end if;
-  if coalesce(p_hourly_rate, 0) < 0 then raise exception 'Saatlik ücret negatif olamaz'; end if;
+  perform _check_pay(p_pay_type, p_hourly_rate, p_monthly_salary, p_monthly_hours);
   c := _staff_shift_setup(p_shift_ids, p_week_plan, p_off_days);
-  insert into staff (name, code, shift_id, shift_ids, week_plan, hourly_rate, off_days)
-  values (trim(p_name), _pick_code(p_code), c.shift_ids[1], c.shift_ids, c.week_plan, coalesce(p_hourly_rate, 0), c.off_days)
+  insert into staff (name, code, shift_id, shift_ids, week_plan, off_days, pay_type, hourly_rate, monthly_salary, monthly_hours)
+  values (trim(p_name), _pick_code(p_code), c.shift_ids[1], c.shift_ids, c.week_plan, c.off_days, p_pay_type,
+          case when p_pay_type = 'hourly' then coalesce(p_hourly_rate, 0) else 0 end,
+          case when p_pay_type = 'salary' then p_monthly_salary end, p_monthly_hours)
   returning * into s;
   return _staff_json(s);
 end $$;
 
-create or replace function admin_update_staff(p_token text, p_id bigint, p_name text, p_shift_ids bigint[], p_hourly_rate numeric,
+create or replace function admin_update_staff(p_token text, p_id bigint, p_name text, p_shift_ids bigint[], p_pay_type text,
+  p_hourly_rate numeric default 0, p_monthly_salary numeric default null, p_monthly_hours numeric default null,
   p_off_days int[] default '{}', p_week_plan jsonb default '{}') returns json
 language plpgsql security definer set search_path = public, extensions as $$
 declare s staff; c record;
 begin
   perform _assert_admin(p_token);
   if coalesce(trim(p_name), '') = '' then raise exception 'İsim gerekli'; end if;
-  if coalesce(p_hourly_rate, 0) < 0 then raise exception 'Saatlik ücret negatif olamaz'; end if;
+  perform _check_pay(p_pay_type, p_hourly_rate, p_monthly_salary, p_monthly_hours);
   c := _staff_shift_setup(p_shift_ids, p_week_plan, p_off_days);
   update staff set name = trim(p_name), shift_id = c.shift_ids[1], shift_ids = c.shift_ids, week_plan = c.week_plan,
-    hourly_rate = coalesce(p_hourly_rate, 0), off_days = c.off_days
+    off_days = c.off_days, pay_type = p_pay_type,
+    hourly_rate = case when p_pay_type = 'hourly' then coalesce(p_hourly_rate, 0) else 0 end,
+    monthly_salary = case when p_pay_type = 'salary' then p_monthly_salary end, monthly_hours = p_monthly_hours
   where id = p_id and not deleted returning * into s;
   if not found then raise exception 'Personel bulunamadı'; end if;
   -- Ücret değişikliği hâlâ açık olan mesaiye de uygulanır
@@ -798,6 +819,7 @@ begin
     'staff', coalesce((
       select json_agg(json_build_object(
         'id', s.id, 'name', s.name, 'offDays', s.off_days, 'shiftId', s.shift_id, 'shiftIds', s.shift_ids, 'hourlyRate', s.hourly_rate,
+        'payType', s.pay_type, 'monthlySalary', s.monthly_salary, 'monthlyHours', s.monthly_hours,
         'days', (
           select json_agg(json_build_object(
             'day', d.day, 'status', d.status, 'late', d.late, 'leave', d.is_leave,
@@ -857,8 +879,8 @@ grant execute on function
   admin_save_shift(text, bigint, text, time, time, boolean),
   admin_delete_shift(text, bigint),
   admin_set_day_shift(text, bigint, date, bigint),
-  admin_add_staff(text, text, bigint[], numeric, int[], jsonb, text),
-  admin_update_staff(text, bigint, text, bigint[], numeric, int[], jsonb),
+  admin_add_staff(text, text, bigint[], text, numeric, numeric, numeric, int[], jsonb, text),
+  admin_update_staff(text, bigint, text, bigint[], text, numeric, numeric, numeric, int[], jsonb),
   admin_delete_staff(text, bigint),
   admin_set_code(text, bigint, text),
   admin_manual_checkin(text, bigint),

@@ -24,7 +24,9 @@ export default function RecordTable({ records, empty }) {
             <td>{tFmt(r.checkIn)}</td>
             <td>{r.checkOut ? tFmt(r.checkOut) : <span className="pill on">Mesaide</span>}</td>
             <td>{durFmt(r.minutes)}</td>
-            <td><b>{money(r.earning)}</b><span className="dim block">{money(r.hourlyRate)}/sa</span></td>
+            <td>{r.payType === 'salary' && !Number(r.hourlyRate)
+              ? <span className="dim">Maaşlı</span>
+              : <><b>{money(r.earning)}</b><span className="dim block">{money(r.hourlyRate)}/sa</span></>}</td>
             <td>
               {r.late > 0 && <span className="pill late">{r.late} dk geç</span>}{' '}
               {r.manual && <span className="pill">Manuel</span>}{' '}

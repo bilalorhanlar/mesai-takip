@@ -14,7 +14,10 @@ export default function StaffDialog({ staff, onClose }) {
   const [f, setF] = useState(() => ({
     name: staff?.name || '',
     code: staff?.code || '',
-    rate: staff ? String(staff.hourlyRate) : '0',
+    payType: staff?.payType || 'hourly',
+    rate: staff?.payType === 'hourly' ? String(staff.hourlyRate) : '',
+    salary: staff?.monthlySalary != null ? String(staff.monthlySalary) : '',
+    hours: staff?.monthlyHours != null ? String(staff.monthlyHours) : '',
     shifts: staff?.shiftIds?.length ? staff.shiftIds : state.shifts[0] ? [state.shifts[0].id] : [],
     // gün -> 'auto' | 'off' | vardiya id
     plan: Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((d) => [d,
@@ -36,7 +39,13 @@ export default function StaffDialog({ staff, onClose }) {
     if (!f.shifts.length) return setErr('En az bir vardiya seçin');
     const offDays = Object.entries(f.plan).filter(([, p]) => p === 'off').map(([d]) => Number(d));
     const weekPlan = Object.fromEntries(Object.entries(f.plan).filter(([, p]) => p !== 'off' && p !== 'auto').map(([d, p]) => [d, Number(p)]));
-    const args = { p_name: f.name, p_shift_ids: f.shifts, p_hourly_rate: Number(f.rate), p_off_days: offDays, p_week_plan: weekPlan };
+    const num = (v) => (v === '' ? null : Number(v));
+    const args = {
+      p_name: f.name, p_shift_ids: f.shifts, p_pay_type: f.payType,
+      p_hourly_rate: f.payType === 'hourly' ? num(f.rate) ?? 0 : 0,
+      p_monthly_salary: f.payType === 'salary' ? num(f.salary) : null,
+      p_monthly_hours: num(f.hours), p_off_days: offDays, p_week_plan: weekPlan,
+    };
     try {
       if (staff) {
         const code = f.code.trim();
@@ -64,7 +73,28 @@ export default function StaffDialog({ staff, onClose }) {
           <label>Giriş kodu
             <input className="code-input" value={f.code} onChange={set('code')} inputMode="numeric" pattern="[0-9]{4}" maxLength={4} placeholder="Otomatik" />
           </label>
-          <label>Saatlik ücret (₺)<input type="number" min="0" step="0.01" value={f.rate} onChange={set('rate')} required /></label>
+          <label>Aylık hedef saat
+            <input type="number" min="0" max="744" step="0.5" value={f.hours} onChange={set('hours')} placeholder="Boş bırakılabilir" />
+          </label>
+        </div>
+
+        <div className="dlg-block">
+          <span className="dlg-label">Ücret</span>
+          <div className="seg" role="radiogroup">
+            {[['hourly', 'Saatlik'], ['salary', 'Maaşlı']].map(([v, l]) => (
+              <label key={v} className="seg-opt">
+                <input type="radio" name="payType" value={v} checked={f.payType === v} onChange={set('payType')} />
+                <span>{l}</span>
+              </label>
+            ))}
+          </div>
+          <div className="dlg-grid pay-row">
+            {f.payType === 'hourly' ? (
+              <label>Saatlik ücret (₺)<input type="number" min="0" step="0.01" value={f.rate} onChange={set('rate')} required /></label>
+            ) : (
+              <label>Aylık maaş (₺)<input type="number" min="0" step="0.01" value={f.salary} onChange={set('salary')} placeholder="Boş bırakılabilir" /></label>
+            )}
+          </div>
         </div>
 
         <div className="dlg-block">

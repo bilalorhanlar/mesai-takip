@@ -104,7 +104,8 @@ export default function CalendarTab({ active }) {
     const absent = s.days.filter((d) => d.status === 'absent').length;
     const lateMin = late.reduce((a, d) => a + d.late, 0);
     const mins = s.days.reduce((a, d) => a + (d.minutes || 0), 0);
-    const earn = s.days.reduce((a, d) => a + Number(d.earning || 0), 0);
+    // Maaşlıda aylık maaş eklenir (saatlik kayıtları 0'dır)
+    const earn = s.days.reduce((a, d) => a + Number(d.earning || 0), 0) + (s.payType === 'salary' ? Number(s.monthlySalary || 0) : 0);
     tLate += late.length; tLateMin += lateMin; tAbsent += absent; tEarn += earn;
     return { s, lateMin, absent, mins, earn, names: (s.shiftIds || []).map((id) => state.shifts.find((x) => x.id === id)?.name).filter(Boolean).join(', ') };
   });
@@ -136,7 +137,7 @@ export default function CalendarTab({ active }) {
         { label: 'Geç giriş', value: tLate },
         { label: 'Toplam gecikme', value: tLateMin, unit: 'dk' },
         { label: 'Gelinmeyen gün', value: tAbsent },
-        { label: 'Aylık hakediş', value: money(tEarn), money: true, accent: true },
+        { label: 'Aylık hakediş (maaşlar dahil)', value: money(tEarn), money: true, accent: true },
       ]} />
       <div className="table-wrap cal-wrap">
         <table className="cal">
@@ -168,8 +169,10 @@ export default function CalendarTab({ active }) {
                     ))}
                     <td className={`sum${lateMin ? ' warn' : ''}`}>{lateMin || '–'}</td>
                     <td className={`sum${absent ? ' bad' : ''}`}>{absent || '–'}</td>
-                    <td className="sum">{mins ? hrsFmt(mins) : '–'}</td>
-                    <td className="sum money">{earn ? money(earn) : '–'}</td>
+                    <td className={`sum${s.monthlyHours != null && mins < s.monthlyHours * 60 && cal.to <= cal.today ? ' warn' : ''}`}>
+                      {mins ? hrsFmt(mins) : '–'}{s.monthlyHours != null && <span className="dim"> / {s.monthlyHours}</span>}
+                    </td>
+                    <td className="sum money">{earn ? money(earn) : s.payType === 'salary' ? <span className="dim">Maaşlı</span> : '–'}</td>
                   </tr>
                 ))}
               </tbody>

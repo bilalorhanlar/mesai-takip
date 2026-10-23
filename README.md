@@ -20,6 +20,8 @@ Dockerfile, Caddyfile  Canlı yayın: Next.js derlenir, Caddy sunar ve /api'yi P
 ## Sayfalar
 - `/` — Personel ekranı. İlk açılışta 4 haneli kod girilir, telefon kişiyi hatırlar.
   Sonra tek bir **Mesaiye Başla** butonu var; işyerine 50 m'den uzaksa giriş yapılamaz.
+  Gizlilik: personel ekranında (ve herkese açık API'de) sadece ilk ad ve "mesaide mi" bilgisi vardır;
+  vardiya, saat, geç kalma, ücret gibi her şey yalnızca admin oturumuyla okunabilir.
 - `/admin` — Yönetim paneli.
   - **Şu An:** kim mesaide, bugünkü hakediş, çıkış yaptırma, gerekirse konumsuz manuel giriş
   - **Personel:** ekle; giriş kodu elle (4 hane) ya da otomatik; varsayılan vardiya, saatlik ücret, haftalık izin günleri
@@ -27,7 +29,8 @@ Dockerfile, Caddyfile  Canlı yayın: Next.js derlenir, Caddy sunar ve /api'yi P
   - **Takvim:** personel × gün — zamanında / kaç dk geç / gelmedi / izinli. Güne tıklayınca:
     o günün vardiyasını değiştir, kaydı düzenle ya da unutulan kaydı ekle, izin ver/kaldır
   - **Kayıtlar:** her girişin saatini, vardiyasını ve ücretini sonradan düzenle; Excel (CSV)
-  - **Hakediş:** çalışılan süre × saatlik ücret; personel bazında toplam ve günlük döküm, Excel (CSV)
+  - **Hakediş:** aylık; saatlik çalışanda süre × ücret, maaşlıda aylık maaş. Aylık hedef saat girilenlerde
+    doldurulan/eksik saat. Günlük döküm, Excel (CSV)
   - **Ayarlar:** işyeri konumu ve yarıçap, admin şifresi
 
 Her kayıt, giriş anındaki vardiyayı ve saatlik ücreti saklar: vardiya saatini ya da ücreti sonradan

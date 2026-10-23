@@ -424,3 +424,18 @@ button.c:hover { box-shadow: 0 0 0 2px var(--olive); }
   .week { grid-template-columns: 1fr; }
 }
 .tbl td .check input { min-width: 0; width: 16px; padding: 0; }
+
+/* ---- Ücret türü ve aylık hedef ---- */
+.seg { display: inline-flex; padding: 3px; border-radius: 999px; background: var(--fog); }
+.seg-opt { cursor: pointer; }
+.seg-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-opt span { display: block; padding: 7px 18px; border-radius: 999px; font-size: 14px; color: var(--ink-2); transition: background .15s, color .15s; }
+.seg-opt input:checked + span { background: var(--paper); color: var(--olive); font-weight: 500; box-shadow: 0 1px 3px rgba(27,30,24,.12); }
+.seg-opt input:focus-visible + span { outline: 2px solid var(--olive); outline-offset: 2px; }
+.dlg-grid.pay-row { margin-top: 12px; }
+.progress { display: flex; flex-direction: column; gap: 5px; min-width: 130px; }
+.progress-text { font-size: 13.5px; font-variant-numeric: tabular-nums; }
+.progress-bar { display: block; height: 5px; border-radius: 5px; background: var(--fog-2); overflow: hidden; }
+.progress-bar i { display: block; height: 100%; border-radius: 5px; background: var(--khaki); }
+.progress-bar i.full { background: var(--olive); }
+.row-form label.wide-narrow { flex: 0 1 190px; }
